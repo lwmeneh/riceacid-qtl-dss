@@ -246,62 +246,170 @@ enrich_members=subset('Enrichment_Genes','gene_id',{selected_gene})
 enrich=subset('Enrichment','enrichment_id',tokens(enrich_members,'enrichment_id'))
 qpcr=subset('qPCR_Summary','gene_id',{selected_gene})
 
-st.markdown('### Molecular evidence and provenance')
-tabs=st.tabs(['MQTL & QTLs','Genes & traits','Expression','Protein & promoter','Enrichment','qPCR & primers','Markers','Original sources'])
+
+# -----------------------------------------------------------------------------
+# Evidence navigator: linked context + independent catalogue, with provenance.
+# -----------------------------------------------------------------------------
+def safe_values(frame, column):
+    return sorted(tokens(frame, column), key=str.casefold)
+
+def choose_evidence(label, frame, field, key):
+    opts = safe_values(frame, field)
+    if not opts:
+        st.info(f"No available {label.lower()} identifiers in this scope.")
+        return None
+    return st.selectbox(label, opts, key=key)
+
+def evidence_scope(title, linked, full, key):
+    st.markdown(f"#### {title}")
+    if not linked.empty:
+        st.success(f"{len(linked):,} directly linked record(s) in the current selection.")
+    else:
+        st.warning("No direct records for the current selection. This does not imply biological absence.")
+    options = ["Linked to selected gene"] if not linked.empty else []
+    options += ["Browse complete evidence catalogue"]
+    scope = st.radio("Evidence scope", options, key="scope_" + key, horizontal=True)
+    data = linked if scope.startswith("Linked") else full
+    if scope.startswith("Browse"):
+        st.caption("Independent catalogue: these records are NOT automatically evidence for the selected MQTL or gene.")
+    return data
+
+def evidence_sources(*frames, key):
+    ids = set()
+    for frame in frames:
+        for field in ["source_id", "candidate_source_id", "annotation_source_id", "membership_source_id", "numeric_source_id", "caption_source_id", "curated_source_id", "tm_source_id", "localization_source_id", "sequence_source_id"]:
+            ids |= tokens(frame, field)
+    records = subset("Sources", "source_id", ids)
+    if records.empty:
+        st.caption("No explicit source identifier was resolved for these records.")
+        return
+    with st.expander(f"Original sources and provenance ({len(records)})", expanded=False):
+        grid(records, "Source records", "source_" + key)
+        for _, source_row in records.iterrows():
+            source_id = pretty(source_row.get("source_id"))
+            url = str(source_row.get("file_url", "")).strip()
+            doi = str(source_row.get("study_doi", "")).strip()
+            if url.startswith(("https://", "http://")):
+                st.markdown(f"- **{html.escape(source_id)}:** [Source file]({url})")
+            if doi and doi.lower() not in ("nan", "none"):
+                doi_url = doi if doi.startswith("http") else "https://doi.org/" + doi.removeprefix("doi:")
+                if doi_url.startswith("https://"):
+                    st.markdown(f"- **{html.escape(source_id)}:** [Publication / DOI]({doi_url})")
+
+def row_select(frame, field, selected, key):
+    if selected is None:
+        return frame.iloc[:0]
+    return frame[frame[field].astype("string").str.strip().eq(str(selected)).fillna(False)] if field in frame else frame.iloc[:0]
+
+st.markdown('### Molecular evidence navigator')
+st.caption('Follow linked evidence where available, or browse each complete evidence table independently. Every record retains its original source identifiers.')
+tabs = st.tabs(['MQTL & QTLs','Genes & traits','Expression','Protein & promoter','Enrichment','qPCR & primers','Markers','Original sources'])
+
 with tabs[0]:
-    grid(pd.DataFrame([record]),'Selected meta-QTL','mqtl_record')
-    grid(member,'Constituent QTL relationships','mqtl_qtl_members')
-    grid(original,'Original QTLs','original_qtls')
-    grid(projected,'Projected QTLs','projected_qtls')
-    grid(selected_qtl_frame,'Selected QTL record','selected_qtl')
+    grid(pd.DataFrame([record]), 'Selected meta-QTL', 'mqtl_record')
+    grid(member, 'Constituent QTL relationships', 'mqtl_qtl_members')
+    grid(original, 'Original QTLs', 'original_qtls')
+    grid(projected, 'Projected QTLs', 'projected_qtls')
+    grid(selected_qtl_frame, 'Selected QTL record', 'selected_qtl')
+    evidence_sources(pd.DataFrame([record]), member, original, projected, key='qtl')
+
 with tabs[1]:
-    grid(gene_frame,'Selected candidate gene','gene_record')
-    grid(links,'All MQTL–gene relationships','mqtl_gene_links')
-    trait_ids=tokens(original,'trait_code')
-    if qt=='Original QTL' and selected_qtl:trait_ids=tokens(selected_qtl_frame,'trait_code')
-    grid(subset('Traits','trait_code',trait_ids),'Traits supported by linked original QTLs','traits', 'Traits are linked through QTL records, not automatically attributed to the selected gene.')
+    grid(gene_frame, 'Selected candidate gene', 'gene_record')
+    grid(links, 'MQTL–gene relationships', 'mqtl_gene_links')
+    trait_ids = tokens(selected_qtl_frame if qt == 'Original QTL' and selected_qtl else original, 'trait_code')
+    trait_data = subset('Traits', 'trait_code', trait_ids)
+    grid(trait_data, 'Traits from linked original QTLs', 'traits', 'A trait linked to a QTL is not automatically experimentally demonstrated for every gene in its interval.')
+    evidence_sources(gene_frame, links, trait_data, key='traits')
+
 with tabs[2]:
-    grid(expr,'Gene expression observations','expression','Expression values and scales are preserved as reported; cross-study comparisons require harmonization.')
-    grid(expr_ds,'Associated expression datasets','expression_datasets')
-    if not expr.empty and 'expression_value_as_supplied' in expr:
-        v=pd.to_numeric(expr['expression_value_as_supplied'],errors='coerce')
-        plot=expr.loc[v.notna()].copy()
-        if not plot.empty:
-            plot['value']=v[v.notna()]
-            plot['dataset']=plot.get('expression_dataset_id',pd.Series(['Record']*len(plot),index=plot.index)).astype(str)
-            fig=px.bar(plot,x='dataset',y='value',color_discrete_sequence=['#19876a'],title='Reported expression values (not normalized across datasets)')
-            fig.update_layout(plot_bgcolor='rgba(0,0,0,0)',paper_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig,use_container_width=True)
+    data = evidence_scope('Gene expression', expr, sheet('Expression'), 'expression')
+    gene = choose_evidence('Expression gene ID', data, 'gene_id', 'expr_gene')
+    gene_data = row_select(data, 'gene_id', gene, 'expr_rows')
+    ds_id = choose_evidence('Expression dataset', gene_data, 'expression_dataset_id', 'expr_dataset')
+    rows = row_select(gene_data, 'expression_dataset_id', ds_id, 'expr_ds_rows')
+    grid(rows, 'Selected expression observations', 'expression_detail')
+    datasets = subset('Expression_Datasets', 'expression_dataset_id', {ds_id} if ds_id else set())
+    grid(datasets, 'Dataset and experimental context', 'expression_dataset_detail')
+    if not rows.empty and 'expression_value_as_supplied' in rows:
+        numbers = pd.to_numeric(rows['expression_value_as_supplied'], errors='coerce').dropna()
+        if not numbers.empty:
+            st.metric('Reported expression value (first numeric record)', f'{numbers.iloc[0]:g}')
+            st.caption('Value and scale are as supplied; no cross-study normalization is implied.')
+    evidence_sources(rows, datasets, key='expression')
+
 with tabs[3]:
-    grid(protein,'Protein features and annotations','protein')
-    grid(promoter,'Promoter regulatory motifs','promoter')
+    subtabs = st.tabs(['Protein features', 'Promoter motifs'])
+    with subtabs[0]:
+        data = evidence_scope('Protein features', protein, sheet('Protein_Features'), 'protein')
+        gene = choose_evidence('Protein gene ID', data, 'gene_id', 'protein_gene')
+        rows = row_select(data, 'gene_id', gene, 'protein_rows')
+        transcript = choose_evidence('Transcript ID', rows, 'transcript_id', 'protein_transcript')
+        detail = row_select(rows, 'transcript_id', transcript, 'protein_detail') if transcript else rows
+        grid(detail, 'Protein annotation, domains, localization and sequence', 'protein_details')
+        evidence_sources(detail, key='protein')
+    with subtabs[1]:
+        data = evidence_scope('Promoter sites', promoter, sheet('Promoter_Sites'), 'promoter')
+        gene = choose_evidence('Promoter gene ID', data, 'gene_id', 'promoter_gene')
+        rows = row_select(data, 'gene_id', gene, 'promoter_rows')
+        motif = choose_evidence('Motif name', rows, 'motif_name', 'promoter_motif')
+        detail = row_select(rows, 'motif_name', motif, 'promoter_detail') if motif else rows
+        grid(detail, 'Promoter motifs and reported positions', 'promoter_details')
+        evidence_sources(detail, key='promoter')
+
 with tabs[4]:
-    grid(enrich_members,'Gene–enrichment memberships','enrichment_members')
-    grid(enrich,'Linked enrichment terms','enrichment_terms','Enrichment reflects gene-set membership; it is not direct proof of gene function.')
+    all_members = sheet('Enrichment_Genes')
+    members = evidence_scope('Gene–enrichment memberships', enrich_members, all_members, 'enrichment')
+    gene = choose_evidence('Gene ID for enrichment', members, 'gene_id', 'enrich_gene')
+    gene_members = row_select(members, 'gene_id', gene, 'enrich_gene_rows')
+    eid = choose_evidence('Enrichment term ID', gene_members, 'enrichment_id', 'enrich_term')
+    detail_members = row_select(gene_members, 'enrichment_id', eid, 'enrich_member_detail')
+    terms = subset('Enrichment', 'enrichment_id', {eid} if eid else set())
+    grid(detail_members, 'Gene membership evidence', 'enrichment_membership')
+    grid(terms, 'Enrichment statistics and pathway annotation', 'enrichment_detail', 'Enrichment indicates membership in an analyzed gene set, not functional validation.')
+    evidence_sources(detail_members, terms, key='enrichment')
+
 with tabs[5]:
-    grid(qpcr,'qPCR records explicitly linked by gene ID','qpcr_gene')
-    possible={selected_gene} if selected_gene else set()
+    st.caption('qPCR summaries, replicate values and primer records are linked by target_name. Gene identity is confirmed only where the source explicitly supplies gene_id.')
+    all_qpcr = sheet('qPCR_Summary')
+    aliases = {selected_gene} if selected_gene else set()
     if not gene_frame.empty:
-        for field in ['symbol','symbol_aliases']:
-            for val in tokens(gene_frame,field):possible.update(x.strip() for x in re.split(r'[,;/]',val) if x.strip())
-    target=subset('qPCR_Summary','target_name',possible)
-    if not target.empty:grid(target,'Potential target-name matches (requires confirmation)','qpcr_possible','A matching target name does not independently establish gene identity.')
-    target_names=tokens(qpcr,'target_name')|tokens(target,'target_name')
-    grid(subset('qPCR_Values','target_name',target_names),'qPCR replicate values','qpcr_values')
-    grid(subset('Primers','target_name',target_names),'Primer sequences','primers')
+        for field in ['symbol', 'symbol_aliases']:
+            for val in tokens(gene_frame, field):
+                aliases.update(t.strip() for t in re.split(r'[,;/]', val) if t.strip())
+    linked_qpcr = subset('qPCR_Summary', 'gene_id', {selected_gene} if selected_gene else set())
+    # Alias-only matches are not treated as confirmed gene links.
+    data = evidence_scope('qPCR results', linked_qpcr, all_qpcr, 'qpcr')
+    target = choose_evidence('qPCR target', data, 'target_name', 'qpcr_target')
+    summary = row_select(data, 'target_name', target, 'qpcr_summary')
+    values = subset('qPCR_Values', 'target_name', {target} if target else set())
+    primers = subset('Primers', 'target_name', {target} if target else set())
+    grid(summary, 'qPCR treatment, tissue, genotype and summary values', 'qpcr_summary_detail')
+    grid(values, 'qPCR replicate values', 'qpcr_replicates')
+    grid(primers, 'Forward and reverse primer sequences', 'primer_details')
+    if target and target in aliases and linked_qpcr.empty:
+        st.warning('The target name resembles a gene symbol/alias, but the workbook does not confirm the gene-ID link.')
+    evidence_sources(summary, values, primers, key='qpcr')
+
 with tabs[6]:
-    grid(subset('MQTL_Markers','mqtl_id',{mqtl}),'MQTL-associated markers','mqtl_markers')
-    grid(subset('QTL_Markers','qtl_id',tokens(original,'qtl_id')),'Original QTL-associated markers','qtl_markers')
-    names=set()
-    for f in (pd.DataFrame([record]),member):
-        for col in ['left_marker','right_marker','left_marker_as_supplied','right_marker_as_supplied']:names|=tokens(f,col)
-    grid(subset('Markers','marker_name',names),'Exact marker-name matches','marker_lookup','Names alone may not uniquely identify markers across genetic maps; confirm chromosome and study.')
+    m_markers = subset('MQTL_Markers', 'mqtl_id', {mqtl})
+    q_markers = subset('QTL_Markers', 'qtl_id', tokens(original, 'qtl_id'))
+    st.markdown('#### MQTL and QTL marker relationships')
+    grid(m_markers, 'MQTL-associated markers', 'mqtl_markers')
+    grid(q_markers, 'Original QTL-associated markers', 'qtl_markers')
+    all_marker = sheet('Markers')
+    names = tokens(m_markers, 'marker_name') | tokens(q_markers, 'marker_name')
+    linked_marker = subset('Markers', 'marker_name', names)
+    data = evidence_scope('Genetic map markers', linked_marker, all_marker, 'markers')
+    marker = choose_evidence('Marker name', data, 'marker_name', 'marker_name_choice')
+    detail = row_select(data, 'marker_name', marker, 'marker_detail')
+    grid(detail, 'Marker position and study context', 'marker_detail')
+    evidence_sources(m_markers, q_markers, detail, key='markers')
+
 with tabs[7]:
-    studies=subset('Studies','study_id',tokens(original,'study_id'))
-    grid(studies,'Contributing published studies','studies')
-    frames=[pd.DataFrame([record]),member,original,projected,links,gene_frame,expr,expr_ds,protein,promoter,enrich,enrich_members,qpcr,studies]
-    source_table(frames)
-    st.markdown('<div class="soft-note"><b>Evidence integrity:</b> All linked records are based on explicit identifiers in the workbook. Source references can be incomplete; check the original publication before drawing biological conclusions.</div>',unsafe_allow_html=True)
+    studies = subset('Studies', 'study_id', tokens(original, 'study_id'))
+    grid(studies, 'Contributing published studies', 'studies')
+    evidence_sources(pd.DataFrame([record]), member, original, projected, links, gene_frame, expr, expr_ds, protein, promoter, enrich, enrich_members, qpcr, studies, key='all')
+    st.info('When exploring an independent evidence catalogue, open that section’s source expander to see its own original references.')
 
 st.divider()
-st.caption('RiceAcid-QTL DSS · Local-first research interface · Source data remain unmodified · Not a validated de novo meta-QTL or functional validation engine.')
+st.caption('RiceAcid-QTL DSS · Source records are unchanged · Independent catalogue records are not automatically associated with the selected MQTL.')
