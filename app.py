@@ -96,6 +96,57 @@ h2{font-size:1.35rem!important}h3{font-size:1.08rem!important}
 .sidebar-landscape{height:120px;background-position:center;background-size:cover;border-radius:12px;margin:14px 0}
 @media(max-width:1180px){.research-metrics{grid-template-columns:repeat(4,1fr)}.portal-hero{grid-template-columns:105px 1fr}.portal-art{display:none}.portal-logo{width:100px;height:100px}}
 @media(max-width:700px){.research-metrics{grid-template-columns:repeat(2,1fr)}.portal-hero{grid-template-columns:1fr;padding:18px}.portal-logo{width:82px;height:82px}.portal-title{font-size:31px}.reference-flow{overflow-x:auto;justify-content:flex-start}.reference-step{min-width:75px}.visual-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* v11 Biotechnology Studio: deliberately no screenshot imagery */
+[data-testid="stAppViewContainer"]{background:linear-gradient(160deg,#edf4f6 0%,#f9fbfc 55%,#f2f6f9 100%)!important}
+[data-testid="stSidebar"]{background:linear-gradient(180deg,#082b3b 0%,#093d4d 50%,#08483e 100%)!important;border-right:1px solid #174d56!important}
+[data-testid="stSidebar"] [data-testid="stImage"] img{height:auto!important;width:100%!important;max-width:100%!important;object-fit:cover!important;background:transparent!important;padding:0!important}
+.sidebar-brand{display:flex;gap:11px;align-items:center;padding:7px 0 14px;color:white}
+.sidebar-brand .brand-mark{display:grid;place-items:center;width:39px;height:39px;border-radius:12px;background:linear-gradient(135deg,#c3eaa0,#38ad91);color:#063a38;font-size:27px}
+.sidebar-brand strong{display:block;font-family:Manrope,sans-serif;font-size:21px;letter-spacing:-.06em}
+.sidebar-brand small{display:block;color:#b9d7d5;font-size:9px;letter-spacing:.17em;font-weight:800}
+[data-testid="stSidebar"] [role="radiogroup"] label{border-radius:11px;padding:8px 11px;margin:2px 0;background:#ffffff0b;border:1px solid #ffffff13}
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked){background:#2eab8a44;border-color:#81d2b4}
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{padding-top:1.4rem}
+.block-container{max-width:1760px!important;padding-top:1.2rem!important}
+.portal-hero{position:relative;isolation:isolate;grid-template-columns:104px minmax(0,1fr) 330px;min-height:228px;padding:27px 32px;gap:25px;border-radius:22px;background:linear-gradient(108deg,#062f43 0%,#064a56 63%,#0d6559 100%);border-bottom:0;box-shadow:0 17px 45px #073c4a25;overflow:hidden}
+.portal-hero:after{content:'';position:absolute;right:-80px;top:-100px;width:450px;height:380px;border:1px solid #a2ffda30;border-radius:50%;box-shadow:0 0 0 48px #a2ffda08,0 0 0 105px #a2ffda08;z-index:-1}
+.portal-logo{width:104px;height:104px;padding:11px;border-radius:20px;background:#fff;box-shadow:0 7px 24px #002d3a55;align-self:start}
+.portal-title{font-size:clamp(32px,3.1vw,50px);letter-spacing:-.055em;margin:8px 0 6px}
+.portal-eyebrow{font-size:10px;letter-spacing:.17em;color:#f5d48d}
+.portal-subtitle{font-size:15px;color:#e5f7f3}
+.portal-chips span{background:#ffffff17;border-color:#ffffff31;color:#e6faf2}
+.portal-art{height:170px;border-radius:18px;overflow:hidden;background:#083f4a}
+.portal-art img{width:100%;height:100%;max-height:100%;object-fit:cover;filter:none}
+.research-metrics{gap:11px;margin:17px 0 22px}
+.research-metric{min-height:124px;padding:16px 15px;border-radius:17px;position:relative;overflow:hidden;box-shadow:0 7px 17px #163a4814}
+.research-metric:after{content:'';position:absolute;right:-23px;top:-27px;width:110px;height:110px;border:1px solid #ffffff30;border-radius:50%;box-shadow:0 0 0 20px #ffffff09}
+.research-icon{font-size:22px}.research-name{font-size:11px;margin-top:10px;color:#fff}.research-count{font-size:30px;line-height:1.15;margin-top:5px}
+.workflow-header{font-size:15px;padding:15px 20px;background:linear-gradient(95deg,#0c6b63,#0b4c66)}
+.reference-flow{padding:20px 16px 16px;border-radius:0 0 18px 18px;box-shadow:0 12px 24px #17424a0c}
+.step-circle{width:57px;height:57px;font-size:23px;box-shadow:inset 0 -3px 0 #0000000a}
+.reference-step{font-size:12px;font-weight:650}
+[data-testid="stVerticalBlockBorderWrapper"]>div{border-color:#dce9ed!important;border-radius:16px!important}
+[data-testid="stSelectbox"] [data-baseweb="select"]>div{min-height:45px;border:1px solid #d8e5e9;border-radius:12px!important;background:#fff}
+[data-testid="stTabs"] [role="tablist"]{background:#e8f0f3;gap:5px;padding:7px;border-radius:14px;flex-wrap:wrap}
+[data-testid="stTabs"] button{background:#fff!important;border:1px solid #d9e6e9;border-radius:10px!important;font-size:12px!important;padding:9px 13px!important}
+[data-testid="stTabs"] button[aria-selected="true"]{background:#075c65!important;border-color:#075c65!important;color:white!important}
+[data-testid="stTabs"] button[aria-selected="true"] p{color:white!important}
+[data-testid="stDataFrame"]{border-radius:12px;box-shadow:0 4px 12px #123c480b}
+[data-testid="stMetric"]{background:#fff;border:1px solid #dce8ed;border-radius:13px}
+.stButton>button,.stDownloadButton>button{border-radius:11px!important;font-weight:700!important}
+.lab-heading{display:flex;align-items:center;gap:11px;margin:16px 0 10px;font-family:Manrope,sans-serif;color:#103b4c;font-weight:850;font-size:23px}
+.lab-heading span{background:#d9f4eb;color:#097c67;padding:8px 11px;border-radius:12px;font-size:19px}
+.lab-context{background:#fff;border:1px solid #d9e7ec;border-radius:15px;padding:15px 18px;margin:12px 0 16px;box-shadow:0 5px 17px #0d455010}
+.lab-context .label{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#617f8c;font-weight:800}
+.lab-context .value{font-size:16px;font-weight:800;color:#0d4955;margin-top:4px}
+.evidence-band{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin:12px 0 22px}
+.evidence-cell{background:white;border:1px solid #dce9ed;border-radius:13px;padding:12px 13px;box-shadow:0 3px 10px #143c4b0b}
+.evidence-cell b{display:block;color:#0a5b65;font-size:21px}.evidence-cell small{font-size:11px;color:#607c89}
+.biotech-note{background:#e7f4f5;border:1px solid #cbe5e5;border-left:4px solid #0e9586;border-radius:12px;padding:12px 16px;color:#1b5361;margin:12px 0}
+@media(max-width:1180px){.portal-hero{grid-template-columns:90px 1fr 230px}.portal-logo{width:90px;height:90px}.research-metrics{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:800px){.portal-hero{grid-template-columns:70px 1fr;gap:14px;padding:18px}.portal-logo{width:70px;height:70px}.portal-art{grid-column:1/-1;height:100px}.research-metrics{grid-template-columns:repeat(2,1fr)}.evidence-band{grid-template-columns:repeat(2,1fr)}.portal-title{font-size:30px}.reference-flow{overflow-x:auto;justify-content:flex-start}.reference-step{min-width:80px}}
+
 </style>""",unsafe_allow_html=True)
 
 @st.cache_data(show_spinner="Reading scientific workbook…",max_entries=3)
@@ -178,15 +229,13 @@ def asset_uri(filename):
 
 RICE_IMAGE = asset_uri("rice_landscape.png")
 LOGO_IMAGE = asset_uri("institute_logo_padded.png")
-DNA_IMAGE = asset_uri("rice_dna_banner.png")
+DNA_IMAGE = asset_uri("biotech_banner_art.png")
 
 
-if (ROOT / 'assets' / 'institute_logo.png').is_file():
-    st.sidebar.image(str(ROOT / 'assets' / 'institute_logo_padded.png'), width=112)
 
-st.sidebar.markdown('## 🌾 RiceAcid-QTL DSS')
-st.sidebar.markdown(f'<div class="sidebar-landscape" style="background-image:url({RICE_IMAGE})"></div>', unsafe_allow_html=True)
-st.sidebar.caption('RICE GENOMICS  /  ACID-SOIL TOLERANCE')
+st.sidebar.markdown('<div class="sidebar-brand"><span class="brand-mark">◈</span><div><strong>RiceAcid</strong><small>GENOMICS WORKSPACE</small></div></div>',unsafe_allow_html=True)
+
+st.sidebar.caption('MOLECULAR BREEDING · ACID-SOIL RICE')
 st.sidebar.markdown('<div style="font-size:.8rem;opacity:.85;padding:2px 0 10px">Research discovery and molecular evidence platform</div>', unsafe_allow_html=True)
 PALETTES = {
     'Emerald & Gold': ('#103f36','#0e705c','#f0b957','#f4f8f5','#e6f1eb'),
@@ -239,8 +288,8 @@ st.markdown(f"""<div class="portal-hero">
 <div class="portal-logo"><img src="{LOGO_IMAGE}" alt="ICAR logo"></div>
 <div><div class="portal-eyebrow">ICAR Research Complex for NEH Region · Umiam, Meghalaya</div>
 <div class="portal-title">Rice<em>Acid-QTL</em> DSS</div>
-<div class="portal-subtitle">Rice Acid-Soil Genomic Resource &amp; Decision Support System</div>
-<div class="portal-chips"><span>Meta-QTL</span><span>Candidate genes</span><span>Functional genomics</span><span>Molecular markers</span></div></div>
+<div class="portal-subtitle">A translational genomics workbench for QTL discovery, candidate genes and molecular validation</div>
+<div class="portal-chips"><span>◈ QTL atlas</span><span>⌬ Gene evidence</span><span>◉ Multi-omics</span><span>↗ Literature provenance</span></div></div>
 <div class="portal-art"><img src="{DNA_IMAGE}" alt="Rice and DNA illustration"></div>
 </div>""", unsafe_allow_html=True)
 mq_all=sheet('MQTLs');qtl_all=sheet('QTLs');genes_all=sheet('Genes')
@@ -518,6 +567,15 @@ def row_select(frame, field, selected, key):
         return frame.iloc[:0]
     return frame[frame[field].astype("string").str.strip().eq(str(selected)).fillna(False)] if field in frame else frame.iloc[:0]
 
+# Biotechnologist workbench: show the exact scope before exploring downstream tables.
+st.markdown('<div class="lab-heading"><span>⌬</span> Molecular evidence workbench</div>',unsafe_allow_html=True)
+context_cols=st.columns(3)
+for col, label, val in zip(context_cols,['ACTIVE META-QTL','SELECTED QTL','CANDIDATE GENE'],[mqtl,selected_qtl or 'Not selected',selected_gene or 'Not selected']):
+    with col:
+        st.markdown(f'<div class="lab-context"><div class="label">{html.escape(label)}</div><div class="value">{html.escape(str(val))}</div></div>',unsafe_allow_html=True)
+counts=[('Expression',len(expr)),('Protein',len(protein)),('Promoter',len(promoter)),('Enrichment',len(enrich_members)),('qPCR',len(qpcr))]
+st.markdown('<div class="evidence-band">'+''.join(f'<div class="evidence-cell"><b>{n:,}</b><small>{html.escape(label)} linked records</small></div>' for label,n in counts)+'</div>',unsafe_allow_html=True)
+st.markdown('<div class="biotech-note">Evidence counts indicate records directly linked by gene ID. Use each tab’s <b>complete catalogue</b> to inspect independent studies. Missing evidence is not evidence of biological absence.</div>',unsafe_allow_html=True)
 st.markdown('### 🔬 Molecular evidence navigator')
 st.caption('Follow linked evidence where available, or browse each complete evidence table independently. Every record retains its original source identifiers.')
 tabs = st.tabs(['🧬 MQTL & QTLs','🌱 Genes & traits','📈 Expression','🧪 Protein & promoter','🕸️ Enrichment','🔬 qPCR & primers','📍 Markers','📚 Original sources'])
