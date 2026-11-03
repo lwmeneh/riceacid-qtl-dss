@@ -119,8 +119,34 @@ def interval_figure(record,genes):
     fig.update_layout(height=240,margin=dict(l=15,r=15,t=30,b=25),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',xaxis=dict(title='Physical position (Mb)',showgrid=True,gridcolor='#e7eee9'),yaxis=dict(tickvals=[1,2],ticktext=['Genes','MQTL'],range=[.5,2.5],showgrid=False),legend=dict(orientation='h',y=1.22),font=dict(color='#315a49'))
     st.plotly_chart(fig,use_container_width=True)
 
-st.sidebar.markdown('## 🌾 RiceAcid-QTL')
-st.sidebar.caption('GENOMICS · META-QTL · EVIDENCE')
+st.sidebar.image(str(ROOT / "assets" / "institute_logo.png"), width=112)
+st.sidebar.markdown('## RiceAcid-QTL DSS')
+st.sidebar.caption('RICE GENOMICS  /  ACID-SOIL TOLERANCE')
+st.sidebar.markdown('<div style="font-size:.8rem;opacity:.85;padding:2px 0 10px">Research discovery and molecular evidence platform</div>', unsafe_allow_html=True)
+PALETTES = {
+    'Emerald & Gold': ('#103f36','#0e705c','#f0b957','#f4f8f5','#e6f1eb'),
+    'Navy & Teal': ('#142a4a','#126d88','#f3ba68','#f3f7fb','#e4edf7'),
+    'Plum & Coral': ('#3d284d','#795080','#f4a68c','#faf6fa','#f1e8f4'),
+    'Terracotta & Sage': ('#553a32','#9a5746','#c7aa68','#faf7f2','#f0e9dd'),
+}
+with st.sidebar.expander('🎨 Appearance', expanded=False):
+    palette_name=st.selectbox('Color palette',list(PALETTES),key='palette_choice')
+    st.caption('Changes apply immediately; all scientific data remain unchanged.')
+ink, accent, highlight, canvas, soft=PALETTES[palette_name]
+st.markdown(f"""<style>
+[data-testid="stAppViewContainer"] {{background:{canvas}!important}}
+[data-testid="stSidebar"] {{background:linear-gradient(165deg,{ink}, {accent})!important}}
+.hero {{background:linear-gradient(115deg,{ink}, {accent})!important;border-top:5px solid {highlight}!important}}
+.hero .eyebrow {{color:{highlight}!important}}
+.card {{border-color:{soft}!important;box-shadow:0 5px 22px #172f3912!important}}
+.card .v, [data-testid="stMetricValue"] {{color:{accent}!important}}
+.soft-note {{background:{soft}!important;border-left-color:{highlight}!important}}
+.pill {{background:{soft}!important;color:{ink}!important}}
+.stButton>button[kind="primary"] {{background:{accent}!important;border-color:{accent}!important}}
+[data-testid="stTabs"] button[aria-selected="true"] {{color:{accent}!important;border-bottom-color:{highlight}!important}}
+[data-testid="stSidebar"] [data-testid="stImage"] img {{background:#ffffff;border-radius:16px;padding:10px;box-shadow:0 7px 25px #0002}}
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {{font-weight:600}}
+</style>""",unsafe_allow_html=True)
 st.sidebar.divider()
 with st.sidebar.expander('Data connection',expanded=False):
     st.caption('Local database is loaded automatically when present.')
@@ -143,7 +169,8 @@ page=st.sidebar.radio('Explore', ['Overview','Discovery workflow','Database cata
 st.sidebar.divider()
 st.sidebar.caption('Research use only · Links indicate source-reported associations, not experimental validation.')
 
-st.markdown('<div class="hero"><div class="eyebrow">Rice acid-soil research intelligence</div><h1>RiceAcid · QTL Explorer</h1><p>From soil stress to meta-QTL, candidate gene, molecular evidence and traceable scientific source.</p></div>',unsafe_allow_html=True)
+st.markdown('<div class="hero"><div class="eyebrow">Rice genetics • Research decision-support system</div><h1>RiceAcid · QTL Explorer</h1><p>Explore acid-soil tolerance from elemental stress through QTL and candidate genes to molecular evidence and original sources.</p></div>',unsafe_allow_html=True)
+st.caption('Institutional identity · Research portal | Element → MQTL → QTL → Gene → Evidence → Literature')
 
 mq_all=sheet('MQTLs');qtl_all=sheet('QTLs');genes_all=sheet('Genes')
 if page=='Overview':
