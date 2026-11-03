@@ -22,8 +22,18 @@ def numeric(s): return pd.to_numeric(s,errors='coerce')
 
 st.sidebar.title('🌾 RiceAcid-QTL DSS')
 source=st.sidebar.file_uploader('Optional: replace workbook',type=['xlsx'])
-blob=source.getvalue() if source else DEFAULT.read_bytes()
-try: tables=load_book(blob)
+if source is not None:
+    blob = source.getvalue()
+elif DEFAULT.exists():
+    blob = DEFAULT.read_bytes()
+else:
+    st.info(
+        "Welcome to RiceAcid-QTL DSS. "
+        "Please upload your Excel database (.xlsx) "
+        "using the sidebar to begin."
+    )
+    st.stop()
+  try: tables=load_book(blob)
 except Exception as e:
     st.error(f'Could not read workbook: {e}');st.stop()
 page=st.sidebar.radio('Navigate',['Dashboard','Meta-QTL Explorer','Original QTL Explorer','Candidate Genes','Functional Evidence','Literature & Provenance','Data Quality & Export'])
