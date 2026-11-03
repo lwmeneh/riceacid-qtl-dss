@@ -62,7 +62,15 @@ def subset(name,col,values):
     if frame.empty or col not in frame.columns or not values:return frame.iloc[:0]
     vals={str(x).strip() for x in values}
     return frame[frame[col].astype('string').str.strip().isin(vals).fillna(False)]
-def pretty(x):return '—' if pd.isna(x) else str(x)
+def pretty(x):
+    if x is None:
+        return '—'
+    try:
+        if bool(pd.isna(x)):
+            return '—'
+    except (TypeError, ValueError):
+        pass
+    return str(x)
 def stat(label,value,sub=''):
     st.markdown(f'<div class="card"><div class="k">{html.escape(str(label))}</div><div class="v">{html.escape(str(value))}</div><div class="sub">{html.escape(str(sub))}</div></div>',unsafe_allow_html=True)
 def grid(frame,label,key,desc=None):
@@ -74,7 +82,7 @@ def grid(frame,label,key,desc=None):
     st.dataframe(frame,hide_index=True,use_container_width=True,height=min(420,max(120,42+len(frame)*34)))
     st.download_button('↓ Export CSV',frame.to_csv(index=False).encode('utf-8-sig'),file_name=f'{key}.csv',mime='text/csv',key='export_'+key)
 def choice(label,options,key,empty='No linked records'):
-    opts=sorted({str(v) for v in options if pd.notna(v) and str(v).strip() not in ('','nan')},key=str.casefold)
+    opts=sorted({str(v) for v in options if v is not None and str(v).strip() not in ('','nan','None')},key=str.casefold)
     if not opts:st.caption(empty);return None
     return st.selectbox(label,opts,key=key)
 def source_table(frames):
@@ -107,7 +115,7 @@ def interval_figure(record,genes):
         g=g.dropna(subset=['s','e']);g=g[(g.e>=start)&(g.s<=end)].head(250)
         if not g.empty:
             g['mid']=(g.s+g.e)/2/1e6
-            fig.add_trace(go.Scatter(x=g.mid,y=[1]*len(g),mode='markers',marker=dict(color='#e3a44d',size=8,opacity=.75),text=g['gene_id'],hovertemplate='Gene %{text}<br>%{x:.3f} Mb<extra></extra>',name='Genes (up to 250)'))
+            fig.add_trace(go.Scatter(x=g.mid,y=[1]*len(g),mode='markers',marker=dict(color='#e3a44d',size=8,opacity=.75),text=g['gene_id'] if 'gene_id' in g else ['Gene']*len(g),hovertemplate='Gene %{text}<br>%{x:.3f} Mb<extra></extra>',name='Genes (up to 250)'))
     fig.update_layout(height=240,margin=dict(l=15,r=15,t=30,b=25),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',xaxis=dict(title='Physical position (Mb)',showgrid=True,gridcolor='#e7eee9'),yaxis=dict(tickvals=[1,2],ticktext=['Genes','MQTL'],range=[.5,2.5],showgrid=False),legend=dict(orientation='h',y=1.22),font=dict(color='#315a49'))
     st.plotly_chart(fig,use_container_width=True)
 
@@ -124,11 +132,13 @@ else:
     st.markdown('<div class="hero"><div class="eyebrow">Research decision-support system</div><h1>RiceAcid · QTL Explorer</h1><p>Discover loci, genes, molecular evidence and original sources.</p></div>',unsafe_allow_html=True)
     st.warning('No workbook found. Place Al_MetaQTL_Database_Input.xlsx in the repository data folder, or upload it using the sidebar.')
     st.code(str(DEFAULT),language=None)
+    st.info('For Streamlit Cloud, the local Windows data folder is not accessible. Use the sidebar uploader or configure private server-side storage.')
     st.stop()
 try:DB=read_workbook(raw)
 except Exception as exc:st.error(f'Unable to read Excel workbook: {exc}');st.stop()
 
 st.sidebar.success(f'Connected · {data_mode}')
+st.sidebar.caption(f'{len(DB)} workbook sheets available')
 page=st.sidebar.radio('Explore', ['Overview','Discovery workflow','Database catalogue'],index=1)
 st.sidebar.divider()
 st.sidebar.caption('Research use only · Links indicate source-reported associations, not experimental validation.')
