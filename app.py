@@ -6,6 +6,7 @@ from pathlib import Path
 import io
 import re
 import html
+import base64
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -46,6 +47,47 @@ h2{font-size:1.35rem!important}h3{font-size:1.08rem!important}
 [data-testid="stDataFrame"]{border:1px solid #e2ebe4;border-radius:10px;overflow:hidden}
 .stButton>button[kind="primary"]{background:#146f53;border-color:#146f53;border-radius:10px}
 @media(max-width:768px){.hero{padding:20px}.hero h1{font-size:1.45rem!important}.block-container{padding:1rem}}
+
+/* v6 · Editorial research dashboard design */
+[data-testid="stAppViewContainer"]{background:radial-gradient(circle at 88% 6%,#e7f5ef 0%,transparent 32%),#f4f7fb!important}
+[data-testid="stSidebar"]{border-right:1px solid #ffffff26!important}
+[data-testid="stSidebar"] .stRadio label{padding:9px 12px!important;border-radius:12px!important;transition:background .2s ease}
+[data-testid="stSidebar"] .stRadio label:hover{background:#ffffff1c!important}
+.block-container{max-width:1550px;padding-top:1.1rem!important}
+.hero{position:relative;overflow:hidden;min-height:198px;display:flex;flex-direction:column;justify-content:center;border:1px solid #ffffff35!important;box-shadow:0 20px 44px #123e3526!important}
+.hero:after{content:'◉  ◇  ⌬  ✦';position:absolute;right:35px;top:27px;font-size:38px;letter-spacing:15px;color:#ffffff32;transform:rotate(-12deg);pointer-events:none}
+.hero h1{font-size:clamp(1.8rem,3vw,2.9rem)!important;line-height:1.18!important;max-width:750px}
+.hero p{max-width:720px;font-size:1.03rem!important;line-height:1.55}
+.card{position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;border-radius:19px!important}
+.card:hover{transform:translateY(-3px);box-shadow:0 15px 30px #193c3d1b!important}
+.card:after{content:'✦';position:absolute;right:18px;top:12px;color:#bedbd0;font-size:25px}
+.card .v{font-size:1.95rem!important}
+[data-testid="stTabs"] [role="tablist"]{gap:5px;flex-wrap:wrap;background:#e9eff4;border-radius:15px;padding:6px}
+[data-testid="stTabs"] button{background:white;border-radius:10px;padding:9px 13px;min-height:42px}
+[data-testid="stTabs"] button[aria-selected="true"]{background:#dff3e8!important;box-shadow:0 2px 7px #1a5b3d1a}
+[data-testid="stSelectbox"] [data-baseweb="select"]>div{border-radius:11px!important;min-height:45px}
+[data-testid="stVerticalBlockBorderWrapper"]>div{border-radius:17px!important}
+[data-testid="stDataFrame"]{box-shadow:0 4px 15px #183c3510}
+[data-testid="stDownloadButton"] button{border-radius:10px!important}
+[data-testid="stSidebar"] [data-testid="stImage"] img{max-width:104px!important}
+.visual-kicker{font-size:.72rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#27765b;margin:15px 0 9px}
+.visual-title{font-size:1.42rem;font-weight:800;letter-spacing:-.035em;color:#183b36;margin:10px 0 16px}
+.visual-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin:10px 0 22px}
+.visual-tile{background:#fff;border:1px solid #e3e9ee;border-radius:16px;padding:17px;box-shadow:0 8px 22px #1e45510d}
+.visual-tile .ico{font-size:27px;margin-bottom:7px}
+.visual-tile .num{font-size:27px;font-weight:800;letter-spacing:-.04em;color:#184b3d}
+.visual-tile .lab{font-size:12px;color:#637781;font-weight:700}
+.visual-flow{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0 19px;align-items:center}
+.visual-node{background:#fff;border:1px solid #d9e6e0;border-radius:13px;padding:11px 13px;font-size:12px;font-weight:700;color:#244a40;box-shadow:0 3px 9px #173f3310}
+.visual-arrow{color:#169f79;font-weight:900}
+.image-feature{background:#0d5141;border-radius:18px;overflow:hidden;display:flex;min-height:135px;margin:12px 0 18px;box-shadow:0 10px 25px #1a56441c}
+.image-feature .photo{width:29%;background-position:center;background-size:cover}
+.image-feature .copy{padding:20px 23px;color:#fff;flex:1}
+.image-feature .copy strong{display:block;font-size:19px;line-height:1.3;margin:5px 0}
+.image-feature .copy span{color:#d1efe4;font-size:13px;line-height:1.5}
+.sidebar-landscape{height:120px;background-size:cover;background-position:center;border-radius:13px;border:1px solid #ffffff4d;margin:15px 0 8px;box-shadow:0 10px 25px #0002}
+@media(max-width:900px){.visual-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.image-feature .photo{width:35%}}
+@media(max-width:550px){.visual-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.visual-tile{padding:12px}.image-feature .photo{display:none}.hero{min-height:170px}.hero:after{display:none}}
 </style>""",unsafe_allow_html=True)
 
 @st.cache_data(show_spinner="Reading scientific workbook…",max_entries=3)
@@ -119,8 +161,19 @@ def interval_figure(record,genes):
     fig.update_layout(height=240,margin=dict(l=15,r=15,t=30,b=25),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',xaxis=dict(title='Physical position (Mb)',showgrid=True,gridcolor='#e7eee9'),yaxis=dict(tickvals=[1,2],ticktext=['Genes','MQTL'],range=[.5,2.5],showgrid=False),legend=dict(orientation='h',y=1.22),font=dict(color='#315a49'))
     st.plotly_chart(fig,use_container_width=True)
 
+def asset_uri(filename):
+    path = ROOT / "assets" / filename
+    if not path.is_file():
+        return ""
+    mime = "image/png"
+    return "data:" + mime + ";base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+RICE_IMAGE = asset_uri("rice_landscape.png")
+DNA_IMAGE = asset_uri("rice_dna_banner.png")
+
 st.sidebar.image(str(ROOT / "assets" / "institute_logo.png"), width=112)
 st.sidebar.markdown('## RiceAcid-QTL DSS')
+st.sidebar.markdown(f'<div class="sidebar-landscape" style="background-image:url({RICE_IMAGE})"></div>', unsafe_allow_html=True)
 st.sidebar.caption('RICE GENOMICS  /  ACID-SOIL TOLERANCE')
 st.sidebar.markdown('<div style="font-size:.8rem;opacity:.85;padding:2px 0 10px">Research discovery and molecular evidence platform</div>', unsafe_allow_html=True)
 PALETTES = {
@@ -167,19 +220,21 @@ st.sidebar.success(f'Connected · {data_mode}')
 st.sidebar.caption(f'{len(DB)} workbook sheets available')
 page=st.sidebar.radio('Explore', ['Overview','Discovery workflow','Database catalogue'],index=1)
 st.sidebar.divider()
-st.sidebar.caption('Research use only · Links indicate source-reported associations, not experimental validation.')
+st.sidebar.caption('Research use only · Source-reported associations are not necessarily experimentally validated.')
 
-st.markdown('<div class="hero"><div class="eyebrow">Rice genetics • Research decision-support system</div><h1>RiceAcid · QTL Explorer</h1><p>Explore acid-soil tolerance from elemental stress through QTL and candidate genes to molecular evidence and original sources.</p></div>',unsafe_allow_html=True)
+st.markdown('<div class="hero"><div class="eyebrow">🌾 RICE GENOMICS  /  MOLECULAR BREEDING  /  ACID-SOIL RESILIENCE</div><h1>RiceAcid <span style="color:#f8d57e">QTL Explorer</span></h1><p>Discover genomic regions, connect candidate genes to molecular evidence, and trace every finding back to its original source.</p><div style="margin-top:15px"><span class="pill">🧬 Meta-QTL</span><span class="pill">🔬 Functional evidence</span><span class="pill">📚 Literature provenance</span></div></div>',unsafe_allow_html=True)
+st.markdown(f'<div class="image-feature"><div class="photo" style="background-image:url({DNA_IMAGE})"></div><div class="copy"><span>INTEGRATED SCIENTIFIC RESOURCE</span><strong>From soil stress to gene-level evidence</strong><span>Aluminium tolerance is available in the current workbook. Other elements can be added as independent, curated evidence collections.</span></div></div>',unsafe_allow_html=True)
 st.caption('Institutional identity · Research portal | Element → MQTL → QTL → Gene → Evidence → Literature')
 
 mq_all=sheet('MQTLs');qtl_all=sheet('QTLs');genes_all=sheet('Genes')
 if page=='Overview':
-    st.markdown('## Research database at a glance')
-    a,b,c,d=st.columns(4)
-    with a:stat('Meta-QTLs',f'{len(mq_all):,}','Reported MQTL records')
-    with b:stat('Original QTLs',f'{len(qtl_all):,}','Source-reported loci')
-    with c:stat('Candidate genes',f'{len(genes_all):,}','Gene inventory')
-    with d:stat('Published studies',f'{len(sheet("Studies")):,}','Source studies')
+    st.markdown('<div class="visual-kicker">📊 Scientific knowledgebase</div><div class="visual-title">Research database at a glance</div>',unsafe_allow_html=True)
+    st.markdown(f'''<div class="visual-grid">
+      <div class="visual-tile"><div class="ico">🧬</div><div class="num">{len(mq_all):,}</div><div class="lab">Meta-QTLs</div></div>
+      <div class="visual-tile"><div class="ico">📍</div><div class="num">{len(qtl_all):,}</div><div class="lab">Original QTLs</div></div>
+      <div class="visual-tile"><div class="ico">🌱</div><div class="num">{len(genes_all):,}</div><div class="lab">Candidate genes</div></div>
+      <div class="visual-tile"><div class="ico">📚</div><div class="num">{len(sheet('Studies')):,}</div><div class="lab">Published studies</div></div>
+    </div>''',unsafe_allow_html=True)
     left,right=st.columns([1.5,1])
     with left:
         st.markdown('### Meta-QTL distribution across chromosomes')
@@ -204,7 +259,8 @@ if page=='Database catalogue':
     if name:grid(sheet(name),f'Original data · {name}','sheet_'+name)
     st.stop()
 
-st.markdown('## Guided scientific discovery')
+st.markdown('<div class="visual-kicker">🧭 Guided exploration</div><div class="visual-title">Discover evidence, step by step</div>',unsafe_allow_html=True)
+st.markdown('<div class="visual-flow">'+''.join('<span class="visual-node">'+a+'</span>' + ('<span class="visual-arrow">→</span>' if i<7 else '') for i,a in enumerate(['🧪 Element','🧬 MQTL','📍 QTLs','🌱 Candidate gene','🍃 Traits','🔬 Molecular evidence','🧫 Primers & markers','📚 Sources']))+'</div>',unsafe_allow_html=True)
 st.markdown('<div class="soft-note">Each selection narrows the downstream evidence. The original records and identifiers remain unchanged; missing evidence is clearly marked.</div>',unsafe_allow_html=True)
 
 left,right=st.columns([1,1])
@@ -237,7 +293,7 @@ projected=subset('Projected_QTLs','projected_qtl_id',tokens(member,'projected_qt
 links=subset('MQTL_Genes','mqtl_id',{mqtl})
 linked_genes=subset('Genes','gene_id',tokens(links,'gene_id'))
 
-st.markdown('### Selected MQTL · Evidence snapshot')
+st.markdown('### 🧬 Selected MQTL · Evidence snapshot')
 a,b,c,d=st.columns(4)
 with a:stat('MQTL',mqtl,'Selected region')
 with b:stat('Original QTLs',len(original),'Explicit relationships')
@@ -251,7 +307,7 @@ with st.container(border=True):
         with col:st.metric(label,pretty(record.get(key)))
     st.caption(f'Genome assembly: {pretty(record.get("genome_assembly"))}. cM and bp are distinct coordinate systems; the physical plot uses supplied bp anchors only.')
 
-st.markdown('### Select locus and gene for evidence drill-down')
+st.markdown('### 🔎 Select locus and candidate gene')
 qcol,gcol=st.columns(2)
 with qcol:
     qt=st.radio('QTL category',['Original QTL','Projected QTL'],horizontal=True)
@@ -328,9 +384,9 @@ def row_select(frame, field, selected, key):
         return frame.iloc[:0]
     return frame[frame[field].astype("string").str.strip().eq(str(selected)).fillna(False)] if field in frame else frame.iloc[:0]
 
-st.markdown('### Molecular evidence navigator')
+st.markdown('### 🔬 Molecular evidence navigator')
 st.caption('Follow linked evidence where available, or browse each complete evidence table independently. Every record retains its original source identifiers.')
-tabs = st.tabs(['MQTL & QTLs','Genes & traits','Expression','Protein & promoter','Enrichment','qPCR & primers','Markers','Original sources'])
+tabs = st.tabs(['🧬 MQTL & QTLs','🌱 Genes & traits','📈 Expression','🧪 Protein & promoter','🕸️ Enrichment','🔬 qPCR & primers','📍 Markers','📚 Original sources'])
 
 with tabs[0]:
     grid(pd.DataFrame([record]), 'Selected meta-QTL', 'mqtl_record')
