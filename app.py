@@ -88,6 +88,38 @@ h2{font-size:1.35rem!important}h3{font-size:1.08rem!important}
 .sidebar-landscape{height:120px;background-size:cover;background-position:center;border-radius:13px;border:1px solid #ffffff4d;margin:15px 0 8px;box-shadow:0 10px 25px #0002}
 @media(max-width:900px){.visual-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.image-feature .photo{width:35%}}
 @media(max-width:550px){.visual-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.visual-tile{padding:12px}.image-feature .photo{display:none}.hero{min-height:170px}.hero:after{display:none}}
+
+/* Reference-design v7: screenshot-inspired, live-data dashboard */
+[data-testid="stAppViewContainer"]{background:linear-gradient(180deg,#f0f6f8 0%,#f9fbfc 60%)!important}
+[data-testid="stSidebar"]{background:linear-gradient(180deg,#053d49 0%,#0a6571 100%)!important}
+[data-testid="stSidebar"] [data-testid="stImage"] img{background:#fff;border-radius:50%;padding:9px!important;max-width:110px!important}
+.block-container{max-width:1700px!important;padding-top:.8rem!important}
+.reference-banner{height:172px;background-size:cover;background-position:center;border-radius:0 0 18px 18px;overflow:hidden;margin-bottom:13px;box-shadow:0 9px 20px #0d45552a}
+.reference-banner-shade{background:linear-gradient(90deg,#06414dbb 0%,#08485a88 55%,transparent 100%);height:100%;padding:18px 28px;color:#fff}
+.reference-banner h1{font-size:clamp(1.55rem,2.65vw,2.8rem)!important;line-height:1.15;color:#fff!important;margin:5px 0!important;text-shadow:0 2px 9px #003f40aa}
+.reference-banner h1 span{color:#ffdf68}
+.reference-banner p{font-size:.85rem;color:#f0f9ef;margin:4px 0;max-width:820px;font-weight:600}
+.reference-tag{font-size:.68rem;letter-spacing:.15em;font-weight:800;color:#ffdf68}
+.research-metrics{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;margin:12px 0 16px}
+.research-metric{color:#fff;border-radius:14px;padding:12px 10px 11px;min-height:100px;box-shadow:inset 0 2px 2px #ffffff70,0 5px 13px #123e4c22;position:relative;overflow:hidden}
+.research-metric:after{content:'◯';position:absolute;right:-6px;bottom:-29px;font-size:90px;opacity:.09}
+.research-icon{font-size:23px;line-height:1.1}.research-name{font-size:11px;font-weight:750;margin-top:4px;line-height:1.25}.research-count{font-size:27px;font-weight:850;line-height:1.25}
+.metric-green{background:linear-gradient(135deg,#28940b,#006738)}.metric-purple{background:linear-gradient(135deg,#ad60b9,#5a2589)}
+.metric-blue{background:linear-gradient(135deg,#3d9ae4,#0051a3)}.metric-orange{background:linear-gradient(135deg,#ef9b24,#b95b00)}
+.metric-pink{background:linear-gradient(135deg,#d471a6,#8e2876)}.metric-cyan{background:linear-gradient(135deg,#39a9dc,#00688e)}
+.metric-teal{background:linear-gradient(135deg,#26a6a7,#006c70)}
+.workflow-header{background:linear-gradient(90deg,#258a24,#006359);border-radius:12px 12px 0 0;padding:12px 16px;color:white;font-weight:800;font-size:1.05rem;margin-top:6px}
+.reference-flow{display:flex;align-items:center;justify-content:space-between;gap:4px;background:white;border:1px solid #e0e9e6;border-radius:0 0 15px 15px;padding:15px 10px;box-shadow:0 5px 14px #164c5617;margin-bottom:13px}
+.reference-step{min-width:0;flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;font-size:11px;color:#17365a;line-height:1.2}
+.step-circle{display:flex;align-items:center;justify-content:center;width:49px;height:49px;border-radius:50%;font-size:24px;box-shadow:0 3px 10px #0000000e}
+.step-color-0{background:#dcf5e2}.step-color-1{background:#e6e6ff}.step-color-2{background:#dff2ff}.step-color-3{background:#f0e4ff}
+.flow-chevron{color:#148768;font-weight:900;font-size:16px;flex:0}
+[data-testid="stTabs"] [role="tablist"]{background:#edf2f7;border:1px solid #dce5ed!important}
+[data-testid="stTabs"] button[aria-selected="true"]{background:linear-gradient(180deg,#65b91d,#00743d)!important;color:#fff!important}
+[data-testid="stTabs"] button[aria-selected="true"] p{color:white!important}
+[data-testid="stDataFrame"]{border:1px solid #d8e6e7!important}
+@media(max-width:1200px){.research-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:680px){.research-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.reference-banner{height:175px}.reference-banner-shade{padding:13px}.reference-flow{overflow-x:auto;justify-content:flex-start}.reference-step{min-width:72px}.flow-chevron{font-size:13px}.research-metric{min-height:83px}}
 </style>""",unsafe_allow_html=True)
 
 @st.cache_data(show_spinner="Reading scientific workbook…",max_entries=3)
@@ -165,14 +197,15 @@ def asset_uri(filename):
     path = ROOT / "assets" / filename
     if not path.is_file():
         return ""
-    mime = "image/png"
+    mime = "image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png"
     return "data:" + mime + ";base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
 RICE_IMAGE = asset_uri("rice_landscape.png")
+HEADER_IMAGE = asset_uri("research_header.jpg")
 DNA_IMAGE = asset_uri("rice_dna_banner.png")
 
-st.sidebar.image(str(ROOT / "assets" / "institute_logo.png"), width=112)
-st.sidebar.markdown('## RiceAcid-QTL DSS')
+st.sidebar.image(str(ROOT / "assets" / "institute_logo.png"), width=102)
+st.sidebar.markdown('## 🌾 RiceAcid-QTL DSS')
 st.sidebar.markdown(f'<div class="sidebar-landscape" style="background-image:url({RICE_IMAGE})"></div>', unsafe_allow_html=True)
 st.sidebar.caption('RICE GENOMICS  /  ACID-SOIL TOLERANCE')
 st.sidebar.markdown('<div style="font-size:.8rem;opacity:.85;padding:2px 0 10px">Research discovery and molecular evidence platform</div>', unsafe_allow_html=True)
@@ -187,8 +220,8 @@ with st.sidebar.expander('🎨 Appearance', expanded=False):
     st.caption('Changes apply immediately; all scientific data remain unchanged.')
 ink, accent, highlight, canvas, soft=PALETTES[palette_name]
 st.markdown(f"""<style>
-[data-testid="stAppViewContainer"] {{background:{canvas}!important}}
-[data-testid="stSidebar"] {{background:linear-gradient(165deg,{ink}, {accent})!important}}
+/* Fixed reference-design canvas */
+/* Fixed teal sidebar */
 .hero {{background:linear-gradient(115deg,{ink}, {accent})!important;border-top:5px solid {highlight}!important}}
 .hero .eyebrow {{color:{highlight}!important}}
 .card {{border-color:{soft}!important;box-shadow:0 5px 22px #172f3912!important}}
@@ -218,23 +251,31 @@ except Exception as exc:st.error(f'Unable to read Excel workbook: {exc}');st.sto
 
 st.sidebar.success(f'Connected · {data_mode}')
 st.sidebar.caption(f'{len(DB)} workbook sheets available')
-page=st.sidebar.radio('Explore', ['Overview','Discovery workflow','Database catalogue'],index=1)
+page=st.sidebar.radio('🧭 Navigation', ['Overview','Discovery workflow','Database catalogue'],index=1)
 st.sidebar.divider()
 st.sidebar.caption('Research use only · Source-reported associations are not necessarily experimentally validated.')
 
-st.markdown('<div class="hero"><div class="eyebrow">🌾 RICE GENOMICS  /  MOLECULAR BREEDING  /  ACID-SOIL RESILIENCE</div><h1>RiceAcid <span style="color:#f8d57e">QTL Explorer</span></h1><p>Discover genomic regions, connect candidate genes to molecular evidence, and trace every finding back to its original source.</p><div style="margin-top:15px"><span class="pill">🧬 Meta-QTL</span><span class="pill">🔬 Functional evidence</span><span class="pill">📚 Literature provenance</span></div></div>',unsafe_allow_html=True)
-st.markdown(f'<div class="image-feature"><div class="photo" style="background-image:url({DNA_IMAGE})"></div><div class="copy"><span>INTEGRATED SCIENTIFIC RESOURCE</span><strong>From soil stress to gene-level evidence</strong><span>Aluminium tolerance is available in the current workbook. Other elements can be added as independent, curated evidence collections.</span></div></div>',unsafe_allow_html=True)
-st.caption('Institutional identity · Research portal | Element → MQTL → QTL → Gene → Evidence → Literature')
-
+# Image-led header uses a decorative reference banner; all research values are live workbook values.
+st.markdown(f"""<div class="reference-banner" style="background-image:url('{HEADER_IMAGE}')">
+  <div class="reference-banner-shade"><span class="reference-tag">RICE ACID-SOIL GENOMICS • RESEARCH DECISION SUPPORT</span>
+  <h1>RiceAcid-QTL <span>DSS</span></h1>
+  <p>Meta-QTL • Candidate genes • Functional evidence • Molecular markers • Source traceability</p></div>
+</div>""", unsafe_allow_html=True)
 mq_all=sheet('MQTLs');qtl_all=sheet('QTLs');genes_all=sheet('Genes')
+# Counts are calculated from the uploaded workbook, never from design mockups.
+metric_items = [
+    ('🧬', 'Meta-QTLs', len(mq_all), 'metric-green'),
+    ('📍', 'Original QTLs', len(qtl_all), 'metric-purple'),
+    ('🔗', 'Projected QTLs', len(sheet('Projected_QTLs')), 'metric-blue'),
+    ('🌾', 'Candidate genes', len(genes_all), 'metric-orange'),
+    ('📊', 'Expression records', len(sheet('Expression')), 'metric-pink'),
+    ('🧪', 'qPCR targets', len(sheet('qPCR_Summary')), 'metric-cyan'),
+    ('🧷', 'Molecular markers', len(sheet('Markers')), 'metric-teal'),
+]
+metric_html=''.join(f'<div class="research-metric {color}"><div class="research-icon">{ico}</div><div class="research-name">{html.escape(label)}</div><div class="research-count">{n:,}</div></div>' for ico,label,n,color in metric_items)
+st.markdown('<div class="research-metrics">'+metric_html+'</div>',unsafe_allow_html=True)
 if page=='Overview':
     st.markdown('<div class="visual-kicker">📊 Scientific knowledgebase</div><div class="visual-title">Research database at a glance</div>',unsafe_allow_html=True)
-    st.markdown(f'''<div class="visual-grid">
-      <div class="visual-tile"><div class="ico">🧬</div><div class="num">{len(mq_all):,}</div><div class="lab">Meta-QTLs</div></div>
-      <div class="visual-tile"><div class="ico">📍</div><div class="num">{len(qtl_all):,}</div><div class="lab">Original QTLs</div></div>
-      <div class="visual-tile"><div class="ico">🌱</div><div class="num">{len(genes_all):,}</div><div class="lab">Candidate genes</div></div>
-      <div class="visual-tile"><div class="ico">📚</div><div class="num">{len(sheet('Studies')):,}</div><div class="lab">Published studies</div></div>
-    </div>''',unsafe_allow_html=True)
     left,right=st.columns([1.5,1])
     with left:
         st.markdown('### Meta-QTL distribution across chromosomes')
@@ -259,10 +300,10 @@ if page=='Database catalogue':
     if name:grid(sheet(name),f'Original data · {name}','sheet_'+name)
     st.stop()
 
-st.markdown('<div class="visual-kicker">🧭 Guided exploration</div><div class="visual-title">Discover evidence, step by step</div>',unsafe_allow_html=True)
-st.markdown('<div class="visual-flow">'+''.join('<span class="visual-node">'+a+'</span>' + ('<span class="visual-arrow">→</span>' if i<7 else '') for i,a in enumerate(['🧪 Element','🧬 MQTL','📍 QTLs','🌱 Candidate gene','🍃 Traits','🔬 Molecular evidence','🧫 Primers & markers','📚 Sources']))+'</div>',unsafe_allow_html=True)
-st.markdown('<div class="soft-note">Each selection narrows the downstream evidence. The original records and identifiers remain unchanged; missing evidence is clearly marked.</div>',unsafe_allow_html=True)
-
+st.markdown('<div class="workflow-header">🧬 &nbsp; Discovery workflow: From element to molecular evidence</div>',unsafe_allow_html=True)
+workflow=[('🧪','Element'),('🎯','Meta-QTL'),('📍','QTLs'),('🧬','Candidate gene'),('🌱','Traits'),('🔬','Molecular evidence'),('🧫','Primers / markers'),('📚','Sources')]
+st.markdown('<div class="reference-flow">'+''.join(f'<div class="reference-step"><span class="step-circle step-color-{i%4}">{ico}</span><b>{label}</b></div>'+('<span class="flow-chevron">➜</span>' if i<len(workflow)-1 else '') for i,(ico,label) in enumerate(workflow))+'</div>',unsafe_allow_html=True)
+st.caption('Selections are linked only when the workbook contains an explicit relationship. Unlinked evidence can be browsed separately.')
 left,right=st.columns([1,1])
 with left:
     st.markdown('<div class="step">Step 01 · Soil element / stress</div>',unsafe_allow_html=True)

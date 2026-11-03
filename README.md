@@ -1,12 +1,14 @@
-# RiceAcid-QTL DSS — Visual Edition v6
+# RiceAcid-QTL DSS · Reference Design v7
 
-An improved Streamlit application with a branded sidebar, original rice imagery, colorful research metric tiles, molecular symbols, guided workflow, and evidence tabs. Scientific records are read from the original Excel workbook without altering their values.
+Streamlit research explorer matching the supplied dashboard design. KPI values are computed from the Excel workbook, not the illustrative reference image.
 
-## Local setup
-1. Copy `app.py`, `requirements.txt`, and the **entire `assets` directory** into your GitHub Desktop repository.
-2. Place `Al_MetaQTL_Database_Input.xlsx` in `data/`.
-3. Run `python -m pip install -r requirements.txt` then `python -m streamlit run app.py`.
+## Install locally (Windows)
 
-The `data/` folder is gitignored by default. For Streamlit Cloud, configure separate hosted data storage or upload a workbook through the sidebar.
+1. Copy `app.py`, `requirements.txt`, and the complete `assets/` directory into your GitHub Desktop repository.
+2. Keep `data/Al_MetaQTL_Database_Input.xlsx` on your computer. Add `data/` to `.gitignore` to prevent publishing private data.
+3. Run `python -m pip install -r requirements.txt` and `python -m streamlit run app.py`.
+4. Visit `http://localhost:8501`.
 
-Images are decorative illustrations, not scientific evidence. The source data and gene relationships remain unchanged.
+The hosted Streamlit Cloud app cannot read your Windows-local workbook. Use the optional upload there or configure a secure hosted database.
+
+The header is a decorative visual based on the supplied design reference. It is not scientific evidence. The live data views below it use workbook records. No additional genes, loci, measurements, or links are fabricated.
