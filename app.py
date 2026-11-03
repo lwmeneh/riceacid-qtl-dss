@@ -24,16 +24,14 @@ st.sidebar.title('🌾 RiceAcid-QTL DSS')
 source=st.sidebar.file_uploader('Optional: replace workbook',type=['xlsx'])
 if source is not None:
     blob = source.getvalue()
-elif DEFAULT.exists():
+elif DEFAULT.is_file():
     blob = DEFAULT.read_bytes()
 else:
-    st.info(
-        "Welcome to RiceAcid-QTL DSS. "
-        "Please upload your Excel database (.xlsx) "
-        "using the sidebar to begin."
-    )
+    st.title('Rice Acid-Soil QTL Research DSS')
+    st.info('Upload Al_MetaQTL_Database_Input.xlsx using the sidebar to start exploring your research data.')
+    st.caption('Your workbook is processed in the current Streamlit session. Do not upload confidential data to an untrusted deployment.')
     st.stop()
-  try: tables=load_book(blob)
+try: tables=load_book(blob)
 except Exception as e:
     st.error(f'Could not read workbook: {e}');st.stop()
 page=st.sidebar.radio('Navigate',['Dashboard','Meta-QTL Explorer','Original QTL Explorer','Candidate Genes','Functional Evidence','Literature & Provenance','Data Quality & Export'])
