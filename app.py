@@ -1,140 +1,205 @@
-"""RiceAcid-QTL DSS — research explorer; no de novo meta-analysis."""
+"""RiceAcid-QTL DSS: evidence-traceable, cascading research browser.
+The uploaded workbook is currently an aluminium-tolerance research database.
+"""
 from pathlib import Path
 import io
+import re
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 
-st.set_page_config(page_title='RiceAcid-QTL DSS', page_icon='🌾', layout='wide')
-ROOT=Path(__file__).resolve().parent
-DEFAULT=ROOT/'data'/'Al_MetaQTL_Database_Input.xlsx'
-@st.cache_data(show_spinner='Loading research database...')
-def load_book(blob: bytes):
-    x=pd.ExcelFile(io.BytesIO(blob))
-    return {name:pd.read_excel(x,sheet_name=name).dropna(how='all') for name in x.sheet_names}
+st.set_page_config(page_title="RiceAcid-QTL DSS", page_icon="🌾", layout="wide")
+ROOT = Path(__file__).resolve().parent
+DEFAULT = ROOT / "data" / "Al_MetaQTL_Database_Input.xlsx"
+ELEMENTS = {"Al": "Aluminium toxicity", "Cd": "Cadmium toxicity", "Ca": "Calcium nutrition", "Mg": "Magnesium nutrition", "Fe": "Iron stress/nutrition", "Mn": "Manganese stress/nutrition", "Zn": "Zinc nutrition/toxicity"}
 
-def show_table(df, key, cols=None):
-    if cols: df=df[[c for c in cols if c in df.columns]]
-    st.dataframe(df,hide_index=True,use_container_width=True)
-    st.download_button('Download CSV',df.to_csv(index=False).encode('utf-8-sig'),file_name=f'{key}.csv',mime='text/csv',key='dl_'+key)
+@st.cache_data(show_spinner="Reading workbook...")
+def load_book(raw):
+    xls = pd.ExcelFile(io.BytesIO(raw))
+    return {s: pd.read_excel(xls, sheet_name=s).dropna(how="all") for s in xls.sheet_names}
 
-def numeric(s): return pd.to_numeric(s,errors='coerce')
+def table(name):
+    return db.get(name, pd.DataFrame()).copy()
+
+def rows(name, column=None, values=None):
+    d = table(name)
+    if column is None or values is None or column not in d.columns:
+        return d if column is None else d.iloc[0:0]
+    values = {str(v).strip() for v in values if pd.notna(v)}
+    return d[d[column].astype("string").str.strip().isin(values).fillna(False)]
+
+def ids(d, col):
+    if col not in d: return set()
+    return set(d[col].dropna().astype(str).str.strip()) - {"", "nan", "None"}
+
+def select(label, values, key, default=None):
+    opts = sorted({str(v) for v in values if pd.notna(v) and str(v).strip() and str(v) != 'nan'})
+    if not opts:
+        st.info(f"No available options for {label.lower()}.")
+        return None
+    return st.selectbox(label, opts, index=opts.index(default) if default in opts else 0, key=key)
+
+def display(d, title, key, note=None):
+    st.subheader(f"{title} ({len(d):,})")
+    if note: st.caption(note)
+    if d.empty:
+        st.info("No linked records in this workbook. This does not establish biological absence.")
+        return
+    st.dataframe(d, hide_index=True, use_container_width=True)
+    st.download_button("Download this table (CSV)", d.to_csv(index=False).encode("utf-8-sig"), file_name=f"{key}.csv", mime="text/csv", key=f"dl_{key}")
+
+def source_panel(frames, key):
+    src_ids = set()
+    for d in frames:
+        src_ids |= ids(d, 'source_id')
+    s = rows('Sources', 'source_id', src_ids)
+    display(s, 'Original source records', key+'_sources', 'Source URLs and file references are reproduced from the uploaded workbook; verify access and provenance.')
+    if not s.empty:
+        for _, r in s.iterrows():
+            url = str(r.get('file_url', '')).strip()
+            if url.startswith(('https://','http://')):
+                st.markdown(f"Source **{r.get('source_id','')}**: [Open recorded source]({url})")
+            doi = str(r.get('study_doi','')).strip()
+            if doi and doi.lower() != 'nan':
+                st.markdown(f"DOI: [ {doi} ](https://doi.org/{doi})")
+
+def show_interval(m):
+    start = pd.to_numeric(pd.Series([m.get('left_anchor_bp')]), errors='coerce').iloc[0]
+    end = pd.to_numeric(pd.Series([m.get('right_anchor_bp')]), errors='coerce').iloc[0]
+    if pd.isna(start) or pd.isna(end) or end < start:
+        st.warning('Valid physical interval unavailable for this MQTL.')
+        return
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=[start/1e6,end/1e6], y=[1,1], mode='lines+markers', line=dict(width=12,color='#17816b'), marker=dict(size=10), name='MQTL interval'))
+    fig.update_layout(height=180, title=f"MQTL physical interval · chromosome {m.get('chromosome')} · {m.get('genome_assembly', 'assembly not specified')}", xaxis_title='Physical position (Mb)', yaxis=dict(visible=False,range=[0.5,1.5]), margin=dict(l=15,r=15,t=60,b=30))
+    st.plotly_chart(fig, use_container_width=True)
 
 st.sidebar.title('🌾 RiceAcid-QTL DSS')
-source=st.sidebar.file_uploader('Optional: replace workbook',type=['xlsx'])
-if source is not None:
-    blob = source.getvalue()
-elif DEFAULT.is_file():
-    blob = DEFAULT.read_bytes()
+up = st.sidebar.file_uploader('Upload research workbook (.xlsx)', type=['xlsx'])
+if up is not None: raw = up.getvalue()
+elif DEFAULT.exists(): raw = DEFAULT.read_bytes()
 else:
-    st.title('Rice Acid-Soil QTL Research DSS')
-    st.info('Upload Al_MetaQTL_Database_Input.xlsx using the sidebar to start exploring your research data.')
-    st.caption('Your workbook is processed in the current Streamlit session. Do not upload confidential data to an untrusted deployment.')
+    st.title('Rice Acid-Soil QTL & Meta-QTL Decision Support System')
+    st.info('Upload Al_MetaQTL_Database_Input.xlsx using the left sidebar to begin.')
     st.stop()
-try: tables=load_book(blob)
-except Exception as e:
-    st.error(f'Could not read workbook: {e}');st.stop()
-page=st.sidebar.radio('Navigate',['Dashboard','Meta-QTL Explorer','Original QTL Explorer','Candidate Genes','Functional Evidence','Literature & Provenance','Data Quality & Export'])
-st.sidebar.caption('Research prototype • descriptive exploration only. Gene ranking is heuristic, not experimental validation.')
+try:
+    db = load_book(raw)
+except Exception as exc:
+    st.error(f'Workbook could not be opened: {exc}')
+    st.stop()
 
-if page=='Dashboard':
-    st.title('Rice Acid-Soil QTL Research DSS')
-    st.caption('Evidence-based exploration of aluminium-tolerance QTLs and meta-QTLs')
-    metrics=[('Meta-QTLs','MQTLs'),('Original QTLs','QTLs'),('Genes','Genes'),('Studies','Studies')]
-    for col,(label,key) in zip(st.columns(4),metrics):col.metric(label,len(tables.get(key,[])))
-    mq=tables['MQTLs'].copy()
-    fig=px.histogram(mq,x='chromosome',color='retained' if 'retained' in mq else None,barmode='group',title='Published meta-QTL distribution by chromosome')
-    st.plotly_chart(fig,use_container_width=True)
-    st.info('The workbook contains source-reported intervals and candidate evidence. No new meta-QTL statistics are computed by this app.')
-    st.subheader('Available research datasets')
-    show_table(pd.DataFrame({'Sheet':list(tables),'Records':[len(v) for v in tables.values()]}),'dataset_inventory')
+st.title('Rice Acid-Soil QTL & Meta-QTL Decision Support System')
+st.caption('Evidence-traceable research explorer • original data retained • not a de novo meta-analysis or experimental validation engine')
+element = st.selectbox('1 · Select soil element / stress', list(ELEMENTS), format_func=lambda e: f'{e} — {ELEMENTS[e]}')
+if element != 'Al':
+    st.warning(f'{ELEMENTS[element]} is reserved for future datasets. The uploaded workbook contains aluminium-tolerance evidence only; no cross-element assignment has been made.')
+    st.stop()
 
-elif page=='Meta-QTL Explorer':
-    st.title('Meta-QTL Explorer')
-    df=tables['MQTLs'].copy()
-    chrom=st.multiselect('Chromosomes',sorted(df.chromosome.dropna().unique().tolist()),default=sorted(df.chromosome.dropna().unique().tolist()))
-    df=df[df.chromosome.isin(chrom)]
-    if 'retained' in df:
-        status=st.selectbox('Publication retention',['All','Retained only','Non-retained only'])
-        if status!='All':df=df[numeric(df.retained).eq(1 if status=='Retained only' else 0)]
-    show_table(df,'meta_qtls',['mqtl_id','chromosome','retained','cluster_qtl_n','peak_cm','ci95_width_cm','mean_pve_pct','left_anchor_bp','right_anchor_bp','genome_assembly','source_id'])
-    if len(df):
-        chart=df.copy();chart['start_mb']=numeric(chart.left_anchor_bp)/1e6;chart['end_mb']=numeric(chart.right_anchor_bp)/1e6
-        chart=chart.dropna(subset=['start_mb','end_mb']);chart=chart[chart.end_mb>=chart.start_mb]
-        if len(chart):
-            fig=px.scatter(chart,x='start_mb',y='chromosome',hover_name='mqtl_id',size='cluster_qtl_n',title='MQTL left anchors (Mb); bubble size = constituent QTL count')
-            st.plotly_chart(fig,use_container_width=True)
-        chosen=st.selectbox('Inspect meta-QTL',df.mqtl_id.astype(str).tolist())
-        st.subheader('Constituent QTLs')
-        rel=tables.get('MQTL_QTLs',pd.DataFrame());show_table(rel[rel.mqtl_id.astype(str)==chosen],'mqtl_members')
-        st.subheader('Genes associated with this MQTL')
-        links=tables.get('MQTL_Genes',pd.DataFrame());genes=tables['Genes']
-        if {'mqtl_id','gene_id'}.issubset(links):
-            ids=links.loc[links.mqtl_id.astype(str)==chosen,'gene_id'].dropna().astype(str).unique()
-            show_table(genes[genes.gene_id.astype(str).isin(ids)],'mqtl_gene_list',['gene_id','chromosome','start_bp','end_bp','symbol','description','expression_candidate','recurrent_candidate','candidate_record_status'])
+mq = table('MQTLs')
+if mq.empty or 'mqtl_id' not in mq:
+    st.error('The workbook has no MQTLs sheet with mqtl_id.')
+    st.stop()
+chromosomes = sorted(mq['chromosome'].dropna().unique().tolist()) if 'chromosome' in mq else []
+chrom = st.selectbox('2 · Filter by rice chromosome', ['All'] + chromosomes, format_func=lambda v: 'All chromosomes' if v=='All' else f'Chromosome {v}')
+if chrom != 'All': mq = mq[mq.chromosome.eq(chrom)]
+selected = select('3 · Select Meta-QTL (MQTL)', ids(mq,'mqtl_id'), 'mqtl_select')
+if not selected: st.stop()
+m = mq.loc[mq.mqtl_id.astype(str).eq(selected)].iloc[0]
 
-elif page=='Original QTL Explorer':
-    st.title('Original QTL Explorer')
-    q=tables['QTLs'].copy()
-    study=st.selectbox('Study',['All']+sorted(q.study_id.dropna().astype(str).unique().tolist()))
-    if study!='All':q=q[q.study_id.astype(str)==study]
-    trait=st.selectbox('Trait',['All']+sorted(q.trait_code.dropna().astype(str).unique().tolist()))
-    if trait!='All':q=q[q.trait_code.astype(str)==trait]
-    show_table(q,'original_qtls',['qtl_id','study_id','qtl_name_as_supplied','trait_code','chromosome','lod_as_supplied','pve_as_supplied','pve_input_scale','original_peak_cm','original_ci_start_cm','original_ci_stop_cm','source_id','source_record'])
-    st.warning('PVE input scales vary in the source data. Original CI start/stop may be reversed. These values are displayed as supplied, not normalized or repaired.')
+members = rows('MQTL_QTLs', 'mqtl_id', {selected})
+qtl_ids = ids(members, 'qtl_id')
+projected_ids = ids(members, 'projected_qtl_id')
+original = rows('QTLs', 'qtl_id', qtl_ids)
+projected = rows('Projected_QTLs', 'projected_qtl_id', projected_ids)
+links = rows('MQTL_Genes', 'mqtl_id', {selected})
+linked_genes = rows('Genes', 'gene_id', ids(links,'gene_id'))
 
-elif page=='Candidate Genes':
-    st.title('Candidate Gene Prioritization')
-    g=tables['Genes'].copy()
-    chrom=st.selectbox('Chromosome',['All']+sorted(g.chromosome.dropna().unique().tolist()))
-    if chrom!='All':g=g[g.chromosome==chrom]
-    query=st.text_input('Search gene ID, symbol, description')
-    if query:
-        mask=g[[c for c in ['gene_id','symbol','description'] if c in g]].fillna('').astype(str).apply(lambda c:c.str.contains(query,case=False,regex=False)).any(axis=1)
-        g=g[mask]
-    st.caption('Evidence-priority score: +2 if expression candidate; +2 if recurrent candidate; +1 if interval inventory. This is an illustrative sorting heuristic, not a validated biological score.')
-    for col in ['expression_candidate','recurrent_candidate','in_interval_inventory']:
-        if col not in g:g[col]=0
-    g['evidence_priority']=2*numeric(g.expression_candidate).fillna(0)+2*numeric(g.recurrent_candidate).fillna(0)+numeric(g.in_interval_inventory).fillna(0)
-    g=g.sort_values(['evidence_priority','gene_id'],ascending=[False,True])
-    show_table(g,'ranked_candidate_genes',['gene_id','chromosome','start_bp','end_bp','symbol','description','expression_candidate','recurrent_candidate','in_interval_inventory','evidence_priority','candidate_record_status'])
-    if len(g):
-        chosen=st.selectbox('Gene details',g.gene_id.astype(str).tolist())
-        for sheet in ['Expression','Protein_Features','Promoter_Sites','qPCR_Summary','MQTL_Genes']:
-            tab=tables.get(sheet,pd.DataFrame())
-            if 'gene_id' in tab:
-                matched=tab[tab.gene_id.astype(str)==chosen]
-                if len(matched):
-                    with st.expander(f'{sheet} ({len(matched)})'):show_table(matched,sheet+'_gene')
+c1,c2,c3,c4=st.columns(4)
+c1.metric('Selected MQTL', selected)
+c2.metric('Linked original QTLs',len(original))
+c3.metric('Linked projected QTLs',len(projected))
+c4.metric('Linked genes',len(linked_genes))
+show_interval(m)
 
-elif page=='Functional Evidence':
-    st.title('Functional Evidence')
-    st.warning('Expression differences, protein predictions and promoter motifs are supporting evidence; they do not by themselves establish gene function or experimental validation.')
-    options=['Expression','qPCR_Summary','qPCR_Values','Protein_Features','Promoter_Sites','Enrichment','Primers']
-    name=st.selectbox('Evidence dataset',options)
-    d=tables.get(name,pd.DataFrame())
-    term=st.text_input('Filter all columns (literal text)')
-    if term:
-        d=d[d.fillna('').astype(str).apply(lambda c:c.str.contains(term,case=False,regex=False)).any(axis=1)]
-    show_table(d,'evidence_'+name)
+sections = st.tabs(['MQTL & QTLs','Genes & traits','Expression','Protein & enrichment','qPCR & primers','Markers','Source & provenance','Database inventory'])
+with sections[0]:
+    display(pd.DataFrame([m]), 'Selected meta-QTL', 'mqtl')
+    display(members, 'MQTL–QTL relationship records', 'mqtl_members')
+    display(original, 'Original QTL records', 'original_qtls', 'Only explicitly linked qtl_id records are shown.')
+    display(projected, 'Projected QTL records', 'projected_qtls', 'Only explicitly linked projected_qtl_id records are shown.')
+with sections[1]:
+    display(links, 'MQTL–gene associations', 'mqtl_gene_links')
+    display(linked_genes, 'Candidate genes in selected MQTL', 'mqtl_genes')
+    selected_gene = select('4 · Select candidate gene', ids(linked_genes,'gene_id'), 'gene_select')
+    if selected_gene:
+        st.session_state['last_gene'] = selected_gene
+        display(rows('Genes','gene_id',{selected_gene}), 'Selected gene annotation', 'selected_gene')
+    trait_codes = ids(original,'trait_code')
+    display(rows('Traits','trait_code',trait_codes), 'Traits associated with linked original QTLs', 'mqtl_traits', 'Trait associations are derived through linked QTLs; they are not automatically gene-specific.')
 
-elif page=='Literature & Provenance':
-    st.title('Literature and Source Provenance')
-    name=st.selectbox('Source table',['Studies','Sources','Data_Notes','Fields'])
-    show_table(tables[name],'sources_'+name)
-    st.caption('Source identifiers and original record locators are retained; independently verify literature before treating derived records as authoritative.')
+# A gene selection shared by all evidence tabs, independent of which tab is open.
+with st.sidebar:
+    st.divider()
+    gene = select('Candidate gene for evidence drill-down', ids(linked_genes,'gene_id'), 'global_gene')
+    st.caption('Evidence tabs follow this gene selection. Other records remain visible at MQTL level.')
 
-else:
-    st.title('Data Quality and Export')
-    st.subheader('Missing values and duplicate identifiers')
-    rows=[]
-    for name,d in tables.items():
-        candidates=[c for c in d.columns if c.lower() in ['mqtl_id','qtl_id','gene_id','study_id','source_id']]
-        key=candidates[0] if candidates else None
-        rows.append({'table':name,'records':len(d),'columns':len(d.columns),'missing_cells':int(d.isna().sum().sum()),'duplicate_primary_ids':int(d[key].duplicated().sum()) if key else None})
-    show_table(pd.DataFrame(rows),'quality_summary')
-    st.subheader('Known scientific cautions')
-    st.markdown('- Missing reference assembly identifiers must be resolved before genome-coordinate integration.\n- PVE scales are not uniform across original QTLs.\n- Original genetic-map confidence interval endpoints may need review.\n- Literature-derived candidate status is not equivalent to functional validation.\n- Do not merge meta-QTL intervals from different genome assemblies without verified liftover.')
-    st.subheader('Download any complete table')
-    name=st.selectbox('Table',list(tables))
-    show_table(tables[name],'full_'+name)
+with sections[2]:
+    if gene:
+        expr = rows('Expression','gene_id',{gene})
+        display(expr, 'Gene expression records', 'expression')
+        display(rows('Expression_Datasets','expression_dataset_id',ids(expr,'expression_dataset_id')), 'Linked expression datasets', 'expression_datasets')
+        st.caption('Expression metrics and scales are presented as supplied; do not compare across studies without harmonization.')
+with sections[3]:
+    if gene:
+        protein = rows('Protein_Features','gene_id',{gene})
+        promoter = rows('Promoter_Sites','gene_id',{gene})
+        eg = rows('Enrichment_Genes','gene_id',{gene})
+        enrichment = rows('Enrichment','enrichment_id',ids(eg,'enrichment_id'))
+        display(protein,'Protein features','protein')
+        display(promoter,'Promoter regulatory motifs','promoter')
+        display(enrichment,'Enrichment terms linked through gene membership','enrichment')
+        st.caption('Enrichment is gene-set-level evidence, not proof of an individual gene’s function.')
+with sections[4]:
+    if gene:
+        genes_row = rows('Genes','gene_id',{gene})
+        gene_names = {gene}
+        for col in ('symbol','symbol_aliases'):
+            if col in genes_row:
+                for v in genes_row[col].dropna().astype(str):
+                    gene_names.update(n.strip() for n in re.split(r'[,;/]',v) if n.strip())
+        qsum = rows('qPCR_Summary','gene_id',{gene})
+        # The workbook has qPCR targets that may not be mapped to gene IDs.
+        if not qsum.empty:
+            gene_names |= ids(qsum,'target_name')
+        display(qsum,'qPCR summaries explicitly linked by gene ID','qpcr_summary')
+        target_qpcr = rows('qPCR_Summary','target_name',gene_names)
+        if not target_qpcr.empty:
+            display(target_qpcr,'Potential target-name matches (verify identity)','qpcr_target_matches','Target-name matching is suggestive, not a verified gene mapping.')
+        target_names = ids(qsum,'target_name') | ids(target_qpcr,'target_name')
+        display(rows('qPCR_Values','target_name',target_names),'qPCR replicate values for matched targets','qpcr_values')
+        display(rows('Primers','target_name',target_names),'Primer sequences for matched targets','primers')
+        st.caption('Some qPCR records lack gene_id. Unmatched records are accessible in the inventory and should not be inferred to validate this gene.')
+with sections[5]:
+    marker_names = set()
+    for d in (pd.DataFrame([m]),members):
+        for col in ('left_marker','right_marker','left_marker_as_supplied','right_marker_as_supplied'):
+            marker_names |= ids(d,col)
+    marker_rows = rows('Markers','marker_name',marker_names)
+    display(marker_rows,'Exact marker-name matches','markers','Marker names can recur across maps; study and chromosome must be checked before assigning a physical position.')
+    st.caption('Marker flanks reported in the MQTL and membership tables:')
+    display(members[[c for c in ['qtl_id','projected_qtl_id','left_marker_as_supplied','right_marker_as_supplied','source_id'] if c in members]],'MQTL membership marker flanks','marker_flanks')
+with sections[6]:
+    frames = [pd.DataFrame([m]),members,original,projected,links,linked_genes]
+    if gene:
+        expr=rows('Expression','gene_id',{gene})
+        frames.extend([expr,rows('Expression_Datasets','expression_dataset_id',ids(expr,'expression_dataset_id')),rows('Protein_Features','gene_id',{gene}),rows('Promoter_Sites','gene_id',{gene}),rows('Enrichment_Genes','gene_id',{gene}),rows('qPCR_Summary','gene_id',{gene})])
+    source_panel(frames,'trace')
+    display(rows('Studies','study_id',ids(original,'study_id')),'Contributing studies','linked_studies')
+    st.caption('The source chain may be incomplete where the original workbook lacks identifiers or mappings.')
+with sections[7]:
+    inventory=pd.DataFrame([{'sheet':name,'records':len(d),'columns':len(d.columns),'missing_cells':int(d.isna().sum().sum())} for name,d in db.items()])
+    display(inventory,'Workbook inventory and missingness','inventory')
+    sheet=select('Inspect any original workbook sheet',list(db),'inventory_sheet')
+    if sheet: display(table(sheet),f'Unfiltered sheet: {sheet}','all_'+sheet)
+    st.warning('This application explores source-reported associations; it does not perform statistical meta-QTL inference, confirm candidate-gene function, or harmonize genome assemblies.')
