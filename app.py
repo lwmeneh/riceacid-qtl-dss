@@ -93,4 +93,6 @@ def source_table(frames):
                 st.markdown(f'**{title}:** [DOI / publication]({doi_url})')
     return sources
 
-def interval_figure(record,genes):
+def interval_figure(record, genes):
+    fig = go.Figure()
+    return fig
