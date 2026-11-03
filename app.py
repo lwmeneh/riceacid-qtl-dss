@@ -212,7 +212,10 @@ RICE_IMAGE = asset_uri("rice_landscape.png")
 LOGO_IMAGE = asset_uri("institute_logo.png")
 DNA_IMAGE = asset_uri("rice_dna_banner.png")
 
-st.sidebar.image(str(ROOT / "assets" / "institute_logo.png"), width=102)
+
+if (ROOT / 'assets' / 'institute_logo.png').is_file():
+    st.sidebar.image(str(ROOT / 'assets' / 'institute_logo.png'), width=102)
+
 st.sidebar.markdown('## 🌾 RiceAcid-QTL DSS')
 st.sidebar.markdown(f'<div class="sidebar-landscape" style="background-image:url({RICE_IMAGE})"></div>', unsafe_allow_html=True)
 st.sidebar.caption('RICE GENOMICS  /  ACID-SOIL TOLERANCE')
@@ -259,7 +262,7 @@ except Exception as exc:st.error(f'Unable to read Excel workbook: {exc}');st.sto
 
 st.sidebar.success(f'Connected · {data_mode}')
 st.sidebar.caption(f'{len(DB)} workbook sheets available')
-page=st.sidebar.radio('🧭 Navigation', ['Overview','Discovery workflow','Database catalogue'],index=1)
+page=st.sidebar.radio('🧭 Navigation', ['Overview','Discovery workflow','Gene intelligence','Evidence analytics','Database catalogue'],index=1)
 st.sidebar.divider()
 st.sidebar.caption('Research use only · Source-reported associations are not necessarily experimentally validated.')
 
@@ -303,6 +306,117 @@ if page=='Overview':
         for label,name in [('Projected QTLs','Projected_QTLs'),('Expression records','Expression'),('Protein features','Protein_Features'),('Enrichment terms','Enrichment'),('qPCR summaries','qPCR_Summary'),('Molecular markers','Markers')]:
             st.markdown(f'**{label}** · {len(sheet(name)):,}')
     st.markdown('<div class="soft-note">Select <b>Discovery workflow</b> from the sidebar to explore an element → MQTL → QTL → gene → evidence → source.</div>',unsafe_allow_html=True)
+    st.stop()
+
+
+# Advanced exploration uses explicit workbook links only. These analyses do not
+# infer novel MQTLs or claim functional validation.
+def gene_evidence_index():
+    base=sheet('Genes')
+    if base.empty or 'gene_id' not in base:return pd.DataFrame()
+    out=base[['gene_id']].drop_duplicates().copy()
+    for name, frame, field in [
+        ('MQTL regions',sheet('MQTL_Genes'),'gene_id'),
+        ('Expression records',sheet('Expression'),'gene_id'),
+        ('Protein records',sheet('Protein_Features'),'gene_id'),
+        ('Promoter sites',sheet('Promoter_Sites'),'gene_id'),
+        ('Enrichment memberships',sheet('Enrichment_Genes'),'gene_id'),
+        ('qPCR summaries',sheet('qPCR_Summary'),'gene_id')]:
+        if field in frame:
+            counts=frame.groupby(field,dropna=True).size().rename(name)
+            out=out.join(counts,on='gene_id')
+        else:out[name]=0
+        out[name]=out[name].fillna(0).astype(int)
+    evidence_cols=['Expression records','Protein records','Promoter sites','Enrichment memberships','qPCR summaries']
+    out['Evidence categories present']=(out[evidence_cols]>0).sum(axis=1)
+    out['Evidence coverage (%)']=(out['Evidence categories present']/len(evidence_cols)*100).round(0).astype(int)
+    return out
+
+def gene_profile(gid):
+    result={}
+    for label,table in [('Gene','Genes'),('MQTL membership','MQTL_Genes'),('Expression','Expression'),('Protein','Protein_Features'),('Promoter','Promoter_Sites'),('Enrichment membership','Enrichment_Genes'),('qPCR','qPCR_Summary')]:
+        result[label]=subset(table,'gene_id',{gid})
+    result['Enrichment terms']=subset('Enrichment','enrichment_id',tokens(result['Enrichment membership'],'enrichment_id'))
+    result['Expression datasets']=subset('Expression_Datasets','expression_dataset_id',tokens(result['Expression'],'expression_dataset_id'))
+    return result
+
+def gene_report(gid,parts):
+    lines=[f'# RiceAcid-QTL DSS | Gene evidence dossier',f'Gene: {gid}', 'Source: locally loaded research workbook', 'Evidence coverage is descriptive, not a biological confidence score.', '']
+    for name,frame in parts.items():
+        lines.extend([f'## {name}',f'Records: {len(frame)}',''])
+        if not frame.empty:
+            lines.append(frame.head(100).to_csv(index=False))
+    return '\n'.join(lines)
+
+if page=='Gene intelligence':
+    st.markdown('## 🧬 Candidate-gene intelligence')
+    st.caption('Compare reported evidence across candidate genes. Counts are descriptive, not rankings of biological causality.')
+    idx=gene_evidence_index()
+    if idx.empty:st.info('No gene inventory available.');st.stop()
+    search=st.text_input('Search gene ID or symbol',placeholder='e.g. LOC_Os...')
+    if search:
+        ids=sheet('Genes')
+        matches=ids[[c for c in ['gene_id','symbol','description'] if c in ids]].astype(str).apply(lambda c:c.str.contains(search,case=False,regex=False,na=False)).any(axis=1)
+        idx=idx[idx.gene_id.isin(ids.loc[matches,'gene_id'])]
+    c1,c2,c3=st.columns(3)
+    with c1:st.metric('Genes in current view',f'{len(idx):,}')
+    with c2:st.metric('With expression evidence',f'{(idx["Expression records"]>0).sum():,}')
+    with c3:st.metric('With qPCR records',f'{(idx["qPCR summaries"]>0).sum():,}')
+    st.dataframe(idx.sort_values(['Evidence categories present','MQTL regions'],ascending=False),hide_index=True,use_container_width=True,height=340)
+    st.download_button('Export evidence coverage table',idx.to_csv(index=False).encode('utf-8-sig'),'gene_evidence_coverage.csv','text/csv')
+    gid=choice('Inspect candidate gene',tokens(idx,'gene_id'),'intelligence_gene')
+    if gid:
+        parts=gene_profile(gid)
+        gene=parts['Gene']
+        if not gene.empty:
+            st.markdown('### Gene annotation')
+            st.dataframe(gene,hide_index=True,use_container_width=True)
+        c1,c2=st.columns([1,1])
+        with c1:
+            cov=idx[idx.gene_id==gid]
+            if not cov.empty:
+                fields=['Expression records','Protein records','Promoter sites','Enrichment memberships','qPCR summaries']
+                fig=go.Figure(go.Bar(x=[int(cov.iloc[0][f]>0) for f in fields],y=fields,orientation='h',marker_color=['#20a77c','#2c80cc','#df9b36','#9968c9','#d9689b']))
+                fig.update_layout(title='Evidence availability by category (0/1)',height=310,xaxis=dict(range=[0,1.1],tickvals=[0,1]),margin=dict(l=5,r=5,t=50,b=15),paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig,use_container_width=True)
+        with c2:
+            expr=parts['Expression']
+            if not expr.empty:
+                plot=expr.copy();plot['value']=pd.to_numeric(plot.get('expression_value_as_supplied'),errors='coerce')
+                plot=plot.dropna(subset=['value'])
+                if not plot.empty:
+                    fig=px.bar(plot.head(35),x='expression_dataset_id',y='value',color='metric_as_supplied' if 'metric_as_supplied' in plot else None,title='Reported expression values (original scales)')
+                    fig.update_layout(height=310,paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+                    st.plotly_chart(fig,use_container_width=True)
+                    st.caption('Different studies may use different scales; values must not be compared as normalized measurements.')
+        subtabs=st.tabs(list(parts))
+        for tab,(label,frame) in zip(subtabs,parts.items()):
+            with tab:grid(frame,label,'int_'+label.replace(' ','_'))
+        st.download_button('⬇ Download gene evidence dossier',gene_report(gid,parts).encode('utf8'),f'{gid}_dossier.md','text/markdown')
+    st.stop()
+
+if page=='Evidence analytics':
+    st.markdown('## 📊 Evidence analytics & provenance')
+    st.caption('Data availability, missingness and literature-linked records from the imported workbook.')
+    coverage=gene_evidence_index()
+    a,b=st.columns([1,1])
+    with a:
+        if not coverage.empty:
+            categories=['Expression records','Protein records','Promoter sites','Enrichment memberships','qPCR summaries']
+            bars=pd.DataFrame({'Category':categories,'Genes with records':[(coverage[k]>0).sum() for k in categories]})
+            fig=px.bar(bars,x='Genes with records',y='Category',orientation='h',color='Category',title='Gene-level evidence coverage')
+            fig.update_layout(showlegend=False,height=370,paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig,use_container_width=True)
+    with b:
+        m=sheet('MQTLs')
+        if not m.empty and 'chromosome' in m:
+            dist=m.groupby('chromosome').size().reset_index(name='MQTL count')
+            fig=px.bar(dist,x='chromosome',y='MQTL count',title='Meta-QTL distribution',color_discrete_sequence=['#118c70'])
+            fig.update_layout(height=370,paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig,use_container_width=True)
+    inventory=pd.DataFrame([{'Table':name,'Records':len(frame),'Columns':len(frame.columns),'Missing values':int(frame.isna().sum().sum())} for name,frame in DB.items()])
+    grid(inventory,'Database completeness overview','advanced_inventory')
+    grid(sheet('Data_Notes'),'Curation notes and data limitations','advanced_notes')
     st.stop()
 
 if page=='Database catalogue':
@@ -550,3 +664,5 @@ with tabs[7]:
 
 st.divider()
 st.caption('RiceAcid-QTL DSS · Source records are unchanged · Independent catalogue records are not automatically associated with the selected MQTL.')
+
+# End of advanced DSS v9.
