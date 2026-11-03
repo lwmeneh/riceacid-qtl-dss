@@ -1,0 +1,11 @@
+# Research database
+data/
+
+# Python temporary files
+__pycache__/
+*.pyc
+.venv/
+
+# Local settings
+.env
+.streamlit/secrets.toml
