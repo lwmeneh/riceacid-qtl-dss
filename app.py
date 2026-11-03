@@ -1,205 +1,96 @@
-"""RiceAcid-QTL DSS: evidence-traceable, cascading research browser.
-The uploaded workbook is currently an aluminium-tolerance research database.
+"""RiceAcid-QTL DSS | Research explorer for acid-soil rice genetics.
+Run: streamlit run app.py
+Place the workbook in data/Al_MetaQTL_Database_Input.xlsx.
 """
 from pathlib import Path
 import io
 import re
+import html
 import pandas as pd
+import numpy as np
 import streamlit as st
-import plotly.express as px
 import plotly.graph_objects as go
+import plotly.express as px
 
-st.set_page_config(page_title="RiceAcid-QTL DSS", page_icon="🌾", layout="wide")
+st.set_page_config(page_title="RiceAcid | QTL Discovery", page_icon="🌾", layout="wide", initial_sidebar_state="expanded")
 ROOT = Path(__file__).resolve().parent
 DEFAULT = ROOT / "data" / "Al_MetaQTL_Database_Input.xlsx"
-ELEMENTS = {"Al": "Aluminium toxicity", "Cd": "Cadmium toxicity", "Ca": "Calcium nutrition", "Mg": "Magnesium nutrition", "Fe": "Iron stress/nutrition", "Mn": "Manganese stress/nutrition", "Zn": "Zinc nutrition/toxicity"}
+ELEMENTS = {"Al":"Aluminium toxicity", "Cd":"Cadmium toxicity", "Ca":"Calcium nutrition", "Mg":"Magnesium nutrition", "Fe":"Iron stress / nutrition", "Mn":"Manganese stress / nutrition", "Zn":"Zinc nutrition / toxicity"}
 
-@st.cache_data(show_spinner="Reading workbook...")
-def load_book(raw):
-    xls = pd.ExcelFile(io.BytesIO(raw))
-    return {s: pd.read_excel(xls, sheet_name=s).dropna(how="all") for s in xls.sheet_names}
+st.markdown("""<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+html,body,[class*="css"], [data-testid="stApp"]{font-family:'DM Sans',sans-serif}
+[data-testid="stAppViewContainer"]{background:#f5f8f6;color:#17392e}
+[data-testid="stSidebar"]{background:linear-gradient(175deg,#103e33 0%,#092b25 100%)}
+[data-testid="stSidebar"] *{color:#e9f6ef!important}
+[data-testid="stSidebar"] [data-baseweb="select"] *{color:#17392e!important}
+[data-testid="stSidebar"] input{color:#17392e!important}
+[data-testid="stSidebar"] [data-testid="stFileUploader"]{border:1px dashed #8cbaa9;border-radius:12px;padding:8px}
+.block-container{max-width:1480px;padding-top:1.6rem;padding-bottom:4rem}
+h1,h2,h3{font-family:'Manrope',sans-serif;letter-spacing:-.025em;color:#153d30}
+h1{font-weight:800;font-size:2.15rem!important}
+h2{font-size:1.35rem!important}h3{font-size:1.08rem!important}
+.hero{background:linear-gradient(115deg,#104b3a,#14745a);color:#fff;border-radius:20px;padding:28px 32px;margin-bottom:20px;box-shadow:0 10px 30px #0a49331a}
+.hero h1{color:white!important;margin:0;font-size:2.1rem!important}.hero p{color:#d2e9df;margin:10px 0 0;font-size:1rem}
+.hero .eyebrow{font-size:.74rem;letter-spacing:.15em;text-transform:uppercase;color:#a6d9c2;font-weight:700;margin-bottom:9px}
+.card{background:white;border:1px solid #e1ebe4;border-radius:15px;padding:19px 22px;box-shadow:0 3px 12px #113b2810;margin:6px 0 16px}
+.card .k{color:#6b8577;font-size:.76rem;text-transform:uppercase;letter-spacing:.065em;font-weight:700}
+.card .v{color:#134d39;font-size:1.72rem;font-weight:800;margin-top:6px}
+.card .sub{color:#789185;font-size:.79rem;margin-top:4px}
+.pill{display:inline-block;border-radius:99px;background:#e3f3e9;color:#116749;font-size:.77rem;padding:6px 12px;font-weight:700;margin:3px 4px 3px 0}
+.soft-note{background:#eef7f0;border-left:4px solid #2a9b70;border-radius:8px;padding:12px 16px;color:#24523f;margin:10px 0 20px}
+.step{font-size:.78rem;color:#698475;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+[data-testid="stMetric"]{background:white;border:1px solid #e1ebe4;padding:14px 18px;border-radius:14px}
+[data-testid="stMetricValue"]{color:#165e46}
+[data-testid="stTabs"] button{font-weight:700}
+[data-testid="stDataFrame"]{border:1px solid #e2ebe4;border-radius:10px;overflow:hidden}
+.stButton>button[kind="primary"]{background:#146f53;border-color:#146f53;border-radius:10px}
+@media(max-width:768px){.hero{padding:20px}.hero h1{font-size:1.45rem!important}.block-container{padding:1rem}}
+</style>""",unsafe_allow_html=True)
 
-def table(name):
-    return db.get(name, pd.DataFrame()).copy()
+@st.cache_data(show_spinner="Reading scientific workbook…",max_entries=3)
+def read_workbook(content:bytes):
+    x = pd.ExcelFile(io.BytesIO(content))
+    return {name:pd.read_excel(x,sheet_name=name).dropna(how="all") for name in x.sheet_names}
 
-def rows(name, column=None, values=None):
-    d = table(name)
-    if column is None or values is None or column not in d.columns:
-        return d if column is None else d.iloc[0:0]
-    values = {str(v).strip() for v in values if pd.notna(v)}
-    return d[d[column].astype("string").str.strip().isin(values).fillna(False)]
-
-def ids(d, col):
-    if col not in d: return set()
-    return set(d[col].dropna().astype(str).str.strip()) - {"", "nan", "None"}
-
-def select(label, values, key, default=None):
-    opts = sorted({str(v) for v in values if pd.notna(v) and str(v).strip() and str(v) != 'nan'})
-    if not opts:
-        st.info(f"No available options for {label.lower()}.")
-        return None
-    return st.selectbox(label, opts, index=opts.index(default) if default in opts else 0, key=key)
-
-def display(d, title, key, note=None):
-    st.subheader(f"{title} ({len(d):,})")
-    if note: st.caption(note)
-    if d.empty:
-        st.info("No linked records in this workbook. This does not establish biological absence.")
+def sheet(name):return DB.get(name,pd.DataFrame()).copy()
+def tokens(frame,col):
+    if frame.empty or col not in frame.columns:return set()
+    return {str(x).strip() for x in frame[col].dropna() if str(x).strip() not in ('','nan','None','<NA>')}
+def subset(name,col,values):
+    frame=sheet(name)
+    if frame.empty or col not in frame.columns or not values:return frame.iloc[:0]
+    vals={str(x).strip() for x in values}
+    return frame[frame[col].astype('string').str.strip().isin(vals).fillna(False)]
+def pretty(x):return '—' if pd.isna(x) else str(x)
+def stat(label,value,sub=''):
+    st.markdown(f'<div class="card"><div class="k">{html.escape(str(label))}</div><div class="v">{html.escape(str(value))}</div><div class="sub">{html.escape(str(sub))}</div></div>',unsafe_allow_html=True)
+def grid(frame,label,key,desc=None):
+    st.markdown(f'### {label} <span style="font-size:.78rem;color:#789185;font-weight:500">({len(frame):,})</span>',unsafe_allow_html=True)
+    if desc:st.caption(desc)
+    if frame.empty:
+        st.info('No explicitly linked records are available for this selection. This does not imply biological absence.')
         return
-    st.dataframe(d, hide_index=True, use_container_width=True)
-    st.download_button("Download this table (CSV)", d.to_csv(index=False).encode("utf-8-sig"), file_name=f"{key}.csv", mime="text/csv", key=f"dl_{key}")
+    st.dataframe(frame,hide_index=True,use_container_width=True,height=min(420,max(120,42+len(frame)*34)))
+    st.download_button('↓ Export CSV',frame.to_csv(index=False).encode('utf-8-sig'),file_name=f'{key}.csv',mime='text/csv',key='export_'+key)
+def choice(label,options,key,empty='No linked records'):
+    opts=sorted({str(v) for v in options if pd.notna(v) and str(v).strip() not in ('','nan')},key=str.casefold)
+    if not opts:st.caption(empty);return None
+    return st.selectbox(label,opts,key=key)
+def source_table(frames):
+    source_ids=set()
+    for f in frames:source_ids |= tokens(f,'source_id') | tokens(f,'candidate_source_id') | tokens(f,'annotation_source_id') | tokens(f,'membership_source_id')
+    sources=subset('Sources','source_id',source_ids)
+    grid(sources,'Original source records','sources')
+    if not sources.empty:
+        for _,r in sources.iterrows():
+            title=str(r.get('source_id','Source'))
+            url=str(r.get('file_url','')).strip()
+            doi=str(r.get('study_doi','')).strip()
+            if url.startswith(('https://','http://')):st.markdown(f'**{title}:** [Open recorded source]({url})')
+            if doi and doi.lower()!='nan':
+                doi_url=doi if doi.startswith('http') else 'https://doi.org/'+doi.removeprefix('doi:')
+                st.markdown(f'**{title}:** [DOI / publication]({doi_url})')
+    return sources
 
-def source_panel(frames, key):
-    src_ids = set()
-    for d in frames:
-        src_ids |= ids(d, 'source_id')
-    s = rows('Sources', 'source_id', src_ids)
-    display(s, 'Original source records', key+'_sources', 'Source URLs and file references are reproduced from the uploaded workbook; verify access and provenance.')
-    if not s.empty:
-        for _, r in s.iterrows():
-            url = str(r.get('file_url', '')).strip()
-            if url.startswith(('https://','http://')):
-                st.markdown(f"Source **{r.get('source_id','')}**: [Open recorded source]({url})")
-            doi = str(r.get('study_doi','')).strip()
-            if doi and doi.lower() != 'nan':
-                st.markdown(f"DOI: [ {doi} ](https://doi.org/{doi})")
-
-def show_interval(m):
-    start = pd.to_numeric(pd.Series([m.get('left_anchor_bp')]), errors='coerce').iloc[0]
-    end = pd.to_numeric(pd.Series([m.get('right_anchor_bp')]), errors='coerce').iloc[0]
-    if pd.isna(start) or pd.isna(end) or end < start:
-        st.warning('Valid physical interval unavailable for this MQTL.')
-        return
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=[start/1e6,end/1e6], y=[1,1], mode='lines+markers', line=dict(width=12,color='#17816b'), marker=dict(size=10), name='MQTL interval'))
-    fig.update_layout(height=180, title=f"MQTL physical interval · chromosome {m.get('chromosome')} · {m.get('genome_assembly', 'assembly not specified')}", xaxis_title='Physical position (Mb)', yaxis=dict(visible=False,range=[0.5,1.5]), margin=dict(l=15,r=15,t=60,b=30))
-    st.plotly_chart(fig, use_container_width=True)
-
-st.sidebar.title('🌾 RiceAcid-QTL DSS')
-up = st.sidebar.file_uploader('Upload research workbook (.xlsx)', type=['xlsx'])
-if up is not None: raw = up.getvalue()
-elif DEFAULT.exists(): raw = DEFAULT.read_bytes()
-else:
-    st.title('Rice Acid-Soil QTL & Meta-QTL Decision Support System')
-    st.info('Upload Al_MetaQTL_Database_Input.xlsx using the left sidebar to begin.')
-    st.stop()
-try:
-    db = load_book(raw)
-except Exception as exc:
-    st.error(f'Workbook could not be opened: {exc}')
-    st.stop()
-
-st.title('Rice Acid-Soil QTL & Meta-QTL Decision Support System')
-st.caption('Evidence-traceable research explorer • original data retained • not a de novo meta-analysis or experimental validation engine')
-element = st.selectbox('1 · Select soil element / stress', list(ELEMENTS), format_func=lambda e: f'{e} — {ELEMENTS[e]}')
-if element != 'Al':
-    st.warning(f'{ELEMENTS[element]} is reserved for future datasets. The uploaded workbook contains aluminium-tolerance evidence only; no cross-element assignment has been made.')
-    st.stop()
-
-mq = table('MQTLs')
-if mq.empty or 'mqtl_id' not in mq:
-    st.error('The workbook has no MQTLs sheet with mqtl_id.')
-    st.stop()
-chromosomes = sorted(mq['chromosome'].dropna().unique().tolist()) if 'chromosome' in mq else []
-chrom = st.selectbox('2 · Filter by rice chromosome', ['All'] + chromosomes, format_func=lambda v: 'All chromosomes' if v=='All' else f'Chromosome {v}')
-if chrom != 'All': mq = mq[mq.chromosome.eq(chrom)]
-selected = select('3 · Select Meta-QTL (MQTL)', ids(mq,'mqtl_id'), 'mqtl_select')
-if not selected: st.stop()
-m = mq.loc[mq.mqtl_id.astype(str).eq(selected)].iloc[0]
-
-members = rows('MQTL_QTLs', 'mqtl_id', {selected})
-qtl_ids = ids(members, 'qtl_id')
-projected_ids = ids(members, 'projected_qtl_id')
-original = rows('QTLs', 'qtl_id', qtl_ids)
-projected = rows('Projected_QTLs', 'projected_qtl_id', projected_ids)
-links = rows('MQTL_Genes', 'mqtl_id', {selected})
-linked_genes = rows('Genes', 'gene_id', ids(links,'gene_id'))
-
-c1,c2,c3,c4=st.columns(4)
-c1.metric('Selected MQTL', selected)
-c2.metric('Linked original QTLs',len(original))
-c3.metric('Linked projected QTLs',len(projected))
-c4.metric('Linked genes',len(linked_genes))
-show_interval(m)
-
-sections = st.tabs(['MQTL & QTLs','Genes & traits','Expression','Protein & enrichment','qPCR & primers','Markers','Source & provenance','Database inventory'])
-with sections[0]:
-    display(pd.DataFrame([m]), 'Selected meta-QTL', 'mqtl')
-    display(members, 'MQTL–QTL relationship records', 'mqtl_members')
-    display(original, 'Original QTL records', 'original_qtls', 'Only explicitly linked qtl_id records are shown.')
-    display(projected, 'Projected QTL records', 'projected_qtls', 'Only explicitly linked projected_qtl_id records are shown.')
-with sections[1]:
-    display(links, 'MQTL–gene associations', 'mqtl_gene_links')
-    display(linked_genes, 'Candidate genes in selected MQTL', 'mqtl_genes')
-    selected_gene = select('4 · Select candidate gene', ids(linked_genes,'gene_id'), 'gene_select')
-    if selected_gene:
-        st.session_state['last_gene'] = selected_gene
-        display(rows('Genes','gene_id',{selected_gene}), 'Selected gene annotation', 'selected_gene')
-    trait_codes = ids(original,'trait_code')
-    display(rows('Traits','trait_code',trait_codes), 'Traits associated with linked original QTLs', 'mqtl_traits', 'Trait associations are derived through linked QTLs; they are not automatically gene-specific.')
-
-# A gene selection shared by all evidence tabs, independent of which tab is open.
-with st.sidebar:
-    st.divider()
-    gene = select('Candidate gene for evidence drill-down', ids(linked_genes,'gene_id'), 'global_gene')
-    st.caption('Evidence tabs follow this gene selection. Other records remain visible at MQTL level.')
-
-with sections[2]:
-    if gene:
-        expr = rows('Expression','gene_id',{gene})
-        display(expr, 'Gene expression records', 'expression')
-        display(rows('Expression_Datasets','expression_dataset_id',ids(expr,'expression_dataset_id')), 'Linked expression datasets', 'expression_datasets')
-        st.caption('Expression metrics and scales are presented as supplied; do not compare across studies without harmonization.')
-with sections[3]:
-    if gene:
-        protein = rows('Protein_Features','gene_id',{gene})
-        promoter = rows('Promoter_Sites','gene_id',{gene})
-        eg = rows('Enrichment_Genes','gene_id',{gene})
-        enrichment = rows('Enrichment','enrichment_id',ids(eg,'enrichment_id'))
-        display(protein,'Protein features','protein')
-        display(promoter,'Promoter regulatory motifs','promoter')
-        display(enrichment,'Enrichment terms linked through gene membership','enrichment')
-        st.caption('Enrichment is gene-set-level evidence, not proof of an individual gene’s function.')
-with sections[4]:
-    if gene:
-        genes_row = rows('Genes','gene_id',{gene})
-        gene_names = {gene}
-        for col in ('symbol','symbol_aliases'):
-            if col in genes_row:
-                for v in genes_row[col].dropna().astype(str):
-                    gene_names.update(n.strip() for n in re.split(r'[,;/]',v) if n.strip())
-        qsum = rows('qPCR_Summary','gene_id',{gene})
-        # The workbook has qPCR targets that may not be mapped to gene IDs.
-        if not qsum.empty:
-            gene_names |= ids(qsum,'target_name')
-        display(qsum,'qPCR summaries explicitly linked by gene ID','qpcr_summary')
-        target_qpcr = rows('qPCR_Summary','target_name',gene_names)
-        if not target_qpcr.empty:
-            display(target_qpcr,'Potential target-name matches (verify identity)','qpcr_target_matches','Target-name matching is suggestive, not a verified gene mapping.')
-        target_names = ids(qsum,'target_name') | ids(target_qpcr,'target_name')
-        display(rows('qPCR_Values','target_name',target_names),'qPCR replicate values for matched targets','qpcr_values')
-        display(rows('Primers','target_name',target_names),'Primer sequences for matched targets','primers')
-        st.caption('Some qPCR records lack gene_id. Unmatched records are accessible in the inventory and should not be inferred to validate this gene.')
-with sections[5]:
-    marker_names = set()
-    for d in (pd.DataFrame([m]),members):
-        for col in ('left_marker','right_marker','left_marker_as_supplied','right_marker_as_supplied'):
-            marker_names |= ids(d,col)
-    marker_rows = rows('Markers','marker_name',marker_names)
-    display(marker_rows,'Exact marker-name matches','markers','Marker names can recur across maps; study and chromosome must be checked before assigning a physical position.')
-    st.caption('Marker flanks reported in the MQTL and membership tables:')
-    display(members[[c for c in ['qtl_id','projected_qtl_id','left_marker_as_supplied','right_marker_as_supplied','source_id'] if c in members]],'MQTL membership marker flanks','marker_flanks')
-with sections[6]:
-    frames = [pd.DataFrame([m]),members,original,projected,links,linked_genes]
-    if gene:
-        expr=rows('Expression','gene_id',{gene})
-        frames.extend([expr,rows('Expression_Datasets','expression_dataset_id',ids(expr,'expression_dataset_id')),rows('Protein_Features','gene_id',{gene}),rows('Promoter_Sites','gene_id',{gene}),rows('Enrichment_Genes','gene_id',{gene}),rows('qPCR_Summary','gene_id',{gene})])
-    source_panel(frames,'trace')
-    display(rows('Studies','study_id',ids(original,'study_id')),'Contributing studies','linked_studies')
-    st.caption('The source chain may be incomplete where the original workbook lacks identifiers or mappings.')
-with sections[7]:
-    inventory=pd.DataFrame([{'sheet':name,'records':len(d),'columns':len(d.columns),'missing_cells':int(d.isna().sum().sum())} for name,d in db.items()])
-    display(inventory,'Workbook inventory and missingness','inventory')
-    sheet=select('Inspect any original workbook sheet',list(db),'inventory_sheet')
-    if sheet: display(table(sheet),f'Unfiltered sheet: {sheet}','all_'+sheet)
-    st.warning('This application explores source-reported associations; it does not perform statistical meta-QTL inference, confirm candidate-gene function, or harmonize genome assemblies.')
+def interval_figure(record,genes):
