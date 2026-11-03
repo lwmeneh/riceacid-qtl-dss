@@ -120,6 +120,14 @@ h2{font-size:1.35rem!important}h3{font-size:1.08rem!important}
 [data-testid="stDataFrame"]{border:1px solid #d8e6e7!important}
 @media(max-width:1200px){.research-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:680px){.research-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.reference-banner{height:175px}.reference-banner-shade{padding:13px}.reference-flow{overflow-x:auto;justify-content:flex-start}.reference-step{min-width:72px}.flow-chevron{font-size:13px}.research-metric{min-height:83px}}
+
+/* v8 — independent, editable banner components; no screenshot-as-background */
+.clean-brand-hero{display:grid;grid-template-columns:106px minmax(0,1fr) 260px;gap:23px;align-items:center;min-height:202px;padding:24px 28px;margin:0 0 18px;border-radius:19px;overflow:hidden;background:radial-gradient(circle at 87% 20%,#247c70 0%,transparent 39%),linear-gradient(110deg,#063c43 0%,#075a61 62%,#0b5b49 100%);border-bottom:5px solid #e9bd4f;box-shadow:0 15px 32px #0a42402b}
+.brand-identity img{width:99px;height:99px;object-fit:contain;border-radius:50%;background:#fff;padding:8px;box-shadow:0 5px 18px #002a2855}
+.brand-copy{min-width:0}.brand-overline{color:#f4d17a;font-size:11px;letter-spacing:.105em;font-weight:800;line-height:1.5}.brand-title{font-family:Manrope,sans-serif;color:#fff;font-size:clamp(30px,3.2vw,49px);font-weight:850;letter-spacing:-.04em;line-height:1.16;margin:8px 0 4px}.brand-title span{color:#f7cf62}.brand-subtitle{color:#e6f7ef;font-size:15px;font-weight:600;line-height:1.5}.brand-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}.brand-tags span{border:1px solid #c9e9db66;border-radius:99px;background:#ffffff1a;color:#f5fffa;font-size:11px;font-weight:700;padding:5px 10px}
+.brand-art{display:flex;justify-content:center;align-items:center;height:150px;border-radius:18px;background:linear-gradient(130deg,#c5e5ba22,#ffffff0a);border:1px solid #ffffff22}.brand-art img{width:100%;max-height:125px;object-fit:contain;filter:drop-shadow(0 6px 9px #002f3144)}
+@media(max-width:980px){.clean-brand-hero{grid-template-columns:80px 1fr;gap:15px}.brand-identity img{width:76px;height:76px}.brand-art{display:none}}
+@media(max-width:580px){.clean-brand-hero{grid-template-columns:1fr;padding:19px}.brand-identity{display:none}.brand-title{font-size:32px}.brand-subtitle{font-size:13px}}
 </style>""",unsafe_allow_html=True)
 
 @st.cache_data(show_spinner="Reading scientific workbook…",max_entries=3)
@@ -201,7 +209,7 @@ def asset_uri(filename):
     return "data:" + mime + ";base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
 RICE_IMAGE = asset_uri("rice_landscape.png")
-HEADER_IMAGE = asset_uri("research_header.jpg")
+LOGO_IMAGE = asset_uri("institute_logo.png")
 DNA_IMAGE = asset_uri("rice_dna_banner.png")
 
 st.sidebar.image(str(ROOT / "assets" / "institute_logo.png"), width=102)
@@ -255,11 +263,16 @@ page=st.sidebar.radio('🧭 Navigation', ['Overview','Discovery workflow','Datab
 st.sidebar.divider()
 st.sidebar.caption('Research use only · Source-reported associations are not necessarily experimentally validated.')
 
-# Image-led header uses a decorative reference banner; all research values are live workbook values.
-st.markdown(f"""<div class="reference-banner" style="background-image:url('{HEADER_IMAGE}')">
-  <div class="reference-banner-shade"><span class="reference-tag">RICE ACID-SOIL GENOMICS • RESEARCH DECISION SUPPORT</span>
-  <h1>RiceAcid-QTL <span>DSS</span></h1>
-  <p>Meta-QTL • Candidate genes • Functional evidence • Molecular markers • Source traceability</p></div>
+# Purpose-built HTML banner: separate brand assets, not a screenshot of the interface.
+st.markdown(f"""<div class="clean-brand-hero">
+  <div class="brand-identity"><img src="{LOGO_IMAGE}" alt="Institutional logo"></div>
+  <div class="brand-copy">
+    <div class="brand-overline">ICAR RESEARCH COMPLEX FOR NEH REGION · UMIAM, MEGHALAYA</div>
+    <div class="brand-title">RiceAcid<span>–QTL</span> DSS</div>
+    <div class="brand-subtitle">Rice Acid-Soil Genomics &amp; Decision Support System</div>
+    <div class="brand-tags"><span>Meta-QTL</span><span>Candidate genes</span><span>Molecular evidence</span><span>Breeding markers</span></div>
+  </div>
+  <div class="brand-art"><img src="{DNA_IMAGE}" alt="Rice and genomics illustration"></div>
 </div>""", unsafe_allow_html=True)
 mq_all=sheet('MQTLs');qtl_all=sheet('QTLs');genes_all=sheet('Genes')
 # Counts are calculated from the uploaded workbook, never from design mockups.
